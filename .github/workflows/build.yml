@@ -192,8 +192,23 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
+          name: dino-linux-amd64
           path: artifacts
-          merge-multiple: true
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: dino-macos-universal
+          path: artifacts
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: dino-windows-amd64
+          path: artifacts
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: dino-web-html
+          path: artifacts
 
       - uses: softprops/action-gh-release@v2
         with:
