@@ -30,13 +30,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
       - name: Build Wails app
-        uses: dAppCore/build@v4.0.0
+        uses: dAppServer/wails-build-action@v2.2
         with:
           build-name: dino
           build-platform: ${{ matrix.platform }}
           go-version: "1.22"
-          node-version: "20"
+          node-version: "22"
           nsis: true
           package: false
 
@@ -121,7 +125,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
