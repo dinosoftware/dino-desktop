@@ -1,0 +1,32 @@
+# Build output
+build/*
+!build/appicon.png
+frontend/dist/
+
+# Dependencies
+frontend/node_modules/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Settings (user-specific, not for distribution)
+frontend/public/settings.js
+
+# Agent / AI
+AGENTS.md
+
+# Misc
+*.log

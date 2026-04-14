@@ -1,0 +1,23 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "dino",
+  "outputfilename": "dino",
+  "frontend:install": "npm install",
+  "frontend:build": "npm run build",
+  "frontend:dev:watcher": "npm run dev",
+  "frontend:dev:serverUrl": "auto",
+  "author": {
+    "name": "Dino Desktop",
+    "email": "dino@example.com"
+  },
+  "info": {
+    "companyName": "Dino Desktop",
+    "productName": "Dino Desktop",
+    "productVersion": "1.0.0",
+    "copyright": "Copyright 2024",
+    "comments": "OpenSubsonic music player"
+  },
+  "nsis": {
+    "icon": "build/appicon.png"
+  }
+}

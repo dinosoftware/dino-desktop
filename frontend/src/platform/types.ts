@@ -1,0 +1,107 @@
+import type { Track } from '@/api/types';
+
+export interface PlayQueue {
+  current?: string;
+  position?: number;
+  username?: string;
+  changed?: string;
+  entry?: Track[];
+}
+
+export interface ServerConfig {
+  id: string;
+  name: string;
+  url: string;
+  username: string;
+  token: string;
+  salt: string;
+  isDefault?: boolean;
+}
+
+export interface PlayerState {
+  currentTrack: Track | null;
+  queue: Track[];
+  queueIndex: number;
+  isPlaying: boolean;
+  position: number;
+  duration: number;
+  volume: number;
+  repeat: 'off' | 'all' | 'one';
+  shuffle: boolean;
+}
+
+export interface PlatformAPI {
+  isDesktop: boolean;
+
+  // Storage
+  getServers(): Promise<ServerConfig[]>;
+  saveServers(servers: ServerConfig[]): Promise<void>;
+  getLastServerId(): Promise<string | null>;
+  setLastServerId(id: string): Promise<void>;
+
+  // Player
+  play(track: Track, url: string): Promise<void>;
+  pause(): Promise<void>;
+  resume(): Promise<void>;
+  stop(): Promise<void>;
+  seek(position: number): Promise<void>;
+  setVolume(volume: number): Promise<void>;
+  getPosition(): Promise<number>;
+  getDuration(): Promise<number>;
+  onPositionChange(callback: (position: number) => void): () => void;
+  onDurationChange(callback: (duration: number) => void): () => void;
+  onTrackEnd(callback: () => void): () => void;
+  onTrackError(callback: (error: string) => void): () => void;
+  onPlayStateChange(callback: (isPlaying: boolean) => void): () => void;
+  onBufferChange(callback: (buffered: number) => void): () => void;
+  onNext(callback: () => void): () => void;
+  onPrevious(callback: () => void): () => void;
+
+  // Queue persistence
+  saveQueue(queue: PlayQueue): Promise<void>;
+  loadQueue(): Promise<PlayQueue | null>;
+
+  // System
+  showOpenDialog(options: {
+    title?: string;
+    defaultPath?: string;
+    filters?: { name: string; extensions: string[] }[];
+  }): Promise<string | null>;
+  showSaveDialog(options: {
+    title?: string;
+    defaultPath?: string;
+    filters?: { name: string; extensions: string[] }[];
+  }): Promise<string | null>;
+  openExternal(url: string): Promise<void>;
+
+  setMediaMetadata(track: Track, artworkUrl?: string): Promise<void>;
+
+  getAudioElement(): HTMLAudioElement | null;
+
+  updateDiscordPresence?(args: {
+    enabled: boolean;
+    clientId: string;
+    activityType: number;
+    details: string;
+    state: string;
+    largeImage: string;
+    largeText: string;
+    smallImage: string;
+    smallText: string;
+    showTimestamps: boolean;
+    startMs: number;
+    endMs: number;
+    showButtons: boolean;
+    buttonLabel: string;
+    buttonUrl: string;
+    statusDisplayType: number;
+  }): Promise<void>;
+  clearDiscordPresence?(): Promise<void>;
+  connectDiscord?(clientId: string): Promise<void>;
+
+  // Window (desktop only)
+  minimizeWindow?(): void;
+  maximizeWindow?(): void;
+  closeWindow?(): void;
+  isWindowMaximized?(): Promise<boolean>;
+}
