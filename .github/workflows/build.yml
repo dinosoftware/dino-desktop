@@ -6,6 +6,14 @@ on:
       version:
         description: "Release version (e.g. v1.0.0)"
         required: true
+      build-binaries:
+        description: "Build desktop binaries"
+        type: boolean
+        default: true
+      build-docker:
+        description: "Build and push Docker image"
+        type: boolean
+        default: true
 
 permissions:
   contents: write
@@ -16,6 +24,7 @@ env:
 
 jobs:
   build-desktop:
+    if: inputs.build-binaries
     strategy:
       fail-fast: false
       matrix:
@@ -55,9 +64,35 @@ jobs:
         if: matrix.platform == 'darwin/universal'
         run: wails build -platform ${{ matrix.platform }}
 
-      - name: Build Wails app (Windows with NSIS)
+      - name: Build Wails app (Windows)
         if: matrix.platform == 'windows/amd64'
-        run: wails build -platform ${{ matrix.platform }} -nsis
+        run: wails build -platform ${{ matrix.platform }}
+
+      - name: Build Windows installer
+        if: matrix.platform == 'windows/amd64'
+        shell: pwsh
+        run: |
+          $iss = @"
+          [Setup]
+          AppName=Dino
+          AppVersion=1.0.0
+          DefaultDirName={pf}\Dino
+          DefaultGroupName=Dino
+          OutputBaseFilename=dino-windows-amd64-installer
+          Compression=lzma2/ultra64
+          SolidCompression=yes
+          SetupIconFile=build\appicon.png
+
+          [Files]
+          Source: "build\bin\dino.exe"; DestDir: "{app}"; Flags: ignoreversion
+
+          [Icons]
+          Name: "{group}\Dino"; Filename: "{app}\dino.exe"
+          Name: "{autodesktop}\Dino"; Filename: "{app}\dino.exe"
+          "@
+          $iss | Out-File -Encoding utf8 -FilePath installer.iss
+          choco install innosetup -y --no-progress
+          iscc installer.iss
 
       - name: Package Linux
         if: matrix.platform == 'linux/amd64'
@@ -125,7 +160,7 @@ jobs:
         if: matrix.platform == 'windows/amd64'
         with:
           name: dino-windows-amd64
-          path: build/bin/
+          path: Output/dino-windows-amd64-installer.exe
 
       - uses: actions/upload-artifact@v4
         if: matrix.platform == 'darwin/universal'
@@ -134,6 +169,7 @@ jobs:
           path: dino-macos-universal.zip
 
   build-web:
+    if: inputs.build-binaries
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -158,6 +194,7 @@ jobs:
           path: dino-web.tar.gz
 
   build-docker:
+    if: inputs.build-docker
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -188,6 +225,7 @@ jobs:
     needs:
       - build-desktop
       - build-web
+    if: inputs.build-binaries
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
