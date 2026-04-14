@@ -1,6 +1,6 @@
 # Build output
 build/*
-!build/appicon.png
+!build/appicon.*
 frontend/dist/
 
 # Dependencies
