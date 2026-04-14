@@ -525,7 +525,7 @@ export function SettingsScreen() {
           <h2 className="text-lg font-semibold">About</h2>
         </div>
         <div className="p-4 rounded-xl border bg-card text-sm text-muted-foreground space-y-1">
-          <p className="font-medium text-foreground">Dino Desktop v0.1.0</p>
+          <p className="font-medium text-foreground">Dino Desktop v1.1.1</p>
           <p>A modern music player for OpenSubsonic servers</p>
           <p>Connected to {apiClient.getServerUrl() || 'no server'}</p>
         </div>

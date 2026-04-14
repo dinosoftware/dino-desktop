@@ -14,9 +14,8 @@ interface AudioVisualizerProps {
   mirror?: boolean;
 }
 
-const wired = new WeakSet<HTMLAudioElement>();
-const analyserFor = new WeakMap<HTMLAudioElement, AnalyserNode>();
-const gainFor = new WeakMap<HTMLAudioElement, GainNode>();
+type Entry = { analyser: AnalyserNode; gain: GainNode; ctx: AudioContext };
+const wired = new WeakMap<HTMLAudioElement, Entry>();
 
 export function AudioVisualizer({
   audioElement,
@@ -40,13 +39,10 @@ export function AudioVisualizer({
 
     const onPlay = () => {
       if (wired.has(audioElement)) {
-        const a = analyserFor.get(audioElement);
-        if (a && (a.context as AudioContext).state === 'suspended') {
-          (a.context as AudioContext).resume();
-        }
+        const e = wired.get(audioElement)!;
+        if (e.ctx.state === 'suspended') e.ctx.resume();
         return;
       }
-      wired.add(audioElement);
       try {
         const ctx = new AudioContext();
         const source = ctx.createMediaElementSource(audioElement);
@@ -58,11 +54,9 @@ export function AudioVisualizer({
         source.connect(gain);
         gain.connect(analyser);
         analyser.connect(ctx.destination);
-        analyserFor.set(audioElement, analyser);
-        gainFor.set(audioElement, gain);
-
-        const syncVolume = () => { gain.gain.value = audioElement.volume; };
-        audioElement.addEventListener('volumechange', syncVolume);
+        wired.set(audioElement, { analyser, gain, ctx });
+        const sync = () => { gain.gain.value = audioElement.volume; };
+        audioElement.addEventListener('volumechange', sync);
       } catch {}
     };
 
@@ -97,12 +91,12 @@ export function AudioVisualizer({
       rafRef.current = requestAnimationFrame(draw);
       c.clearRect(0, 0, totalWidth, totalHeight);
 
-      const analyser = audioElement ? analyserFor.get(audioElement) : null;
+      const entry = audioElement ? wired.get(audioElement) : null;
 
-      if (analyser && isPlaying) {
-        const data = new Uint8Array(analyser.frequencyBinCount);
-        analyser.getByteFrequencyData(data);
-        const step = Math.max(1, Math.floor(analyser.frequencyBinCount / barCount));
+      if (entry && isPlaying) {
+        const data = new Uint8Array(entry.analyser.frequencyBinCount);
+        entry.analyser.getByteFrequencyData(data);
+        const step = Math.max(1, Math.floor(entry.analyser.frequencyBinCount / barCount));
         for (let i = 0; i < barCount; i++) {
           const val = data[i * step] / 255;
           const boosted = Math.pow(val, 0.7);

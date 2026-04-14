@@ -814,7 +814,7 @@ export function AppLayout({ children }: AppLayoutProps) {
       </main>
 
       {/* MINI PLAYER */}
-      {playerMode === 'mini' && currentTrack && (
+      {playerMode === 'mini' && (
         <div
           className="fixed bottom-0 right-0 left-0 z-20 border-t"
           style={{ backgroundColor: 'hsl(var(--card))' }}
@@ -823,23 +823,24 @@ export function AppLayout({ children }: AppLayoutProps) {
             {/* LEFT: cover + info stack + menu */}
             <div className="flex items-center gap-3 pl-3 w-[320px] flex-shrink-0">
               <div
-                onClick={() => setPlayerMode('expanded')}
+                onClick={() => currentTrack && setPlayerMode('expanded')}
                 className="h-12 w-12 rounded-lg bg-muted flex items-center justify-center overflow-hidden flex-shrink-0 cursor-pointer"
               >
-                {miniCoverUrl ? (
+                {currentTrack && miniCoverUrl ? (
                   <img src={miniCoverUrl} alt={currentTrack.title} className="w-full h-full object-cover" />
                 ) : (
                   <Music className="h-4 w-4 text-muted-foreground" />
                 )}
               </div>
-              <div className="min-w-0 w-[220px]" onClick={() => setPlayerMode('expanded')} style={{ cursor: 'pointer' }}>
+              <div className="min-w-0 w-[220px]" onClick={() => currentTrack && setPlayerMode('expanded')} style={{ cursor: currentTrack ? 'pointer' : 'default' }}>
                 <div className="flex items-center gap-1.5">
-                  <MarqueeText className="text-sm font-semibold">{currentTrack.title}</MarqueeText>
-                  <span onClick={(e) => { e.stopPropagation(); qualityBadge.toggleDetail(); }} className="px-1 py-0.5 rounded text-[8px] font-bold tracking-wide cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0" style={{ border: '1px solid hsl(var(--muted-foreground))', color: 'hsl(var(--muted-foreground))' }}>{qualityBadge.text}</span>
+                  <MarqueeText className="text-sm font-semibold">{currentTrack?.title ?? 'No track playing'}</MarqueeText>
+                  {currentTrack && <span onClick={(e) => { e.stopPropagation(); qualityBadge.toggleDetail(); }} className="px-1 py-0.5 rounded text-[8px] font-bold tracking-wide cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0" style={{ border: '1px solid hsl(var(--muted-foreground))', color: 'hsl(var(--muted-foreground))' }}>{qualityBadge.text}</span>}
                 </div>
-                <MarqueeText className="text-xs text-muted-foreground">{getArtistDisplay(currentTrack).text}</MarqueeText>
-                {currentTrack.album && <MarqueeText className="text-[10px] text-muted-foreground/60">{currentTrack.album}</MarqueeText>}
+                <MarqueeText className="text-xs text-muted-foreground">{currentTrack ? getArtistDisplay(currentTrack).text : '—'}</MarqueeText>
+                {currentTrack?.album && <MarqueeText className="text-[10px] text-muted-foreground/60">{currentTrack.album}</MarqueeText>}
               </div>
+              {currentTrack && (
               <ContextMenu items={getCurrentTrackContextItems()} trigger="click">
                 <button
                   className="p-1.5 rounded-full transition-colors text-muted-foreground hover:text-foreground hover:bg-accent flex-shrink-0"
@@ -847,6 +848,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                   <MoreVertical className="h-4 w-4" />
                 </button>
               </ContextMenu>
+              )}
             </div>
 
             {/* CENTER: controls + progress */}
