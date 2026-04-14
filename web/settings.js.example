@@ -1,0 +1,6 @@
+window.__DINO_SETTINGS__ = {
+  // serverLock: true,
+  // serverUrl: "https://your-subsonic-server.example.com",
+  // username: "your-username",
+  // password: "your-password",
+};

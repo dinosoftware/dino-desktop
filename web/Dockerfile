@@ -8,6 +8,7 @@ RUN npm run build
 FROM nginx:alpine
 COPY --from=builder /app/dist /usr/share/nginx/html
 COPY web/nginx.conf /etc/nginx/conf.d/default.conf
+COPY web/settings.js.example /usr/share/nginx/html/settings.js.example
 # Create default settings.js from example (override with volume mount)
 RUN cp /usr/share/nginx/html/settings.js.example /usr/share/nginx/html/settings.js
 EXPOSE 80
