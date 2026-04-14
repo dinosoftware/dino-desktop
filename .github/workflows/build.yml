@@ -79,9 +79,9 @@ jobs:
           DefaultDirName={pf}\Dino
           DefaultGroupName=Dino
           OutputBaseFilename=dino-windows-amd64-installer
+          SetupIconFile=build\appicon.ico
           Compression=lzma2/ultra64
           SolidCompression=yes
-          SetupIconFile=build\appicon.png
 
           [Files]
           Source: "build\bin\dino.exe"; DestDir: "{app}"; Flags: ignoreversion
