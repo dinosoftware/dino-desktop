@@ -331,8 +331,20 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   },
 
   resume: async () => {
-    updateDiscordPresence(get().currentTrack, true);
-    await getPlatform().resume();
+    const platform = getPlatform();
+    const { currentTrack, position } = get();
+    if (currentTrack && platform.getAudioElement()?.readyState === 0) {
+      const url = apiClient.buildStreamUrl(currentTrack.id);
+      try {
+        await platform.play(currentTrack, url);
+        if (position > 0) await platform.seek(position);
+      } catch {
+        return;
+      }
+    } else {
+      await platform.resume();
+    }
+    updateDiscordPresence(currentTrack, true);
     saveQueueToServer();
   },
 
@@ -542,15 +554,21 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
           queueIndex,
           currentTrack,
           position: posSeconds,
+          isPlaying: false,
         });
 
         if (currentTrack) {
           const platform = getPlatform();
           const url = apiClient.buildStreamUrl(currentTrack.id);
-          await platform.play(currentTrack, url);
-          await platform.seek(posSeconds);
-          await platform.pause();
           const coverUrl = currentTrack.coverArt ? apiClient.buildCoverArtUrl(currentTrack.coverArt, 512) : undefined;
+          try {
+            await platform.play(currentTrack, url);
+            await platform.seek(posSeconds);
+            await platform.pause();
+            set({ isPlaying: false });
+          } catch {
+            set({ isPlaying: false });
+          }
           platform.setMediaMetadata(currentTrack, coverUrl).catch(() => {});
         }
       }
