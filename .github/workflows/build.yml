@@ -125,7 +125,7 @@ jobs:
         if: matrix.platform == 'windows/amd64'
         with:
           name: dino-windows-amd64
-          path: build/bin/*-installer.exe
+          path: build/bin/
 
       - uses: actions/upload-artifact@v4
         if: matrix.platform == 'darwin/universal'
