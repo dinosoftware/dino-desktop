@@ -52,7 +52,7 @@ class APIClient {
     return serverUrl === 'https://music.fuge.dev' &&
       typeof window !== 'undefined' &&
       window.location.hostname === 'localhost' &&
-      !(window.go?.main?.App);
+      !('electronAPI' in window);
   }
 
   private resolveBaseUrl(serverUrl: string): string {

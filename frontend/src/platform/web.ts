@@ -9,6 +9,8 @@ const QUEUE_KEY = 'dino_queue';
 export class WebPlatform implements PlatformAPI {
   isDesktop = false;
   private audio: HTMLAudioElement;
+  private audioCtx: AudioContext | null = null;
+  private analyserNode: AnalyserNode | null = null;
   private positionCallbacks: Set<(pos: number) => void> = new Set();
   private durationCallbacks: Set<(dur: number) => void> = new Set();
   private trackEndCallbacks: Set<() => void> = new Set();
@@ -17,6 +19,7 @@ export class WebPlatform implements PlatformAPI {
   private bufferCallbacks: Set<(buffered: number) => void> = new Set();
   private nextCallbacks: Set<() => void> = new Set();
   private prevCallbacks: Set<() => void> = new Set();
+  private pendingPlay: Promise<void> = Promise.resolve();
 
   constructor() {
     this.audio = new Audio();
@@ -80,14 +83,45 @@ export class WebPlatform implements PlatformAPI {
     localStorage.setItem(LAST_SERVER_KEY, id);
   }
 
+  private async initAudioPipeline() {
+    if (this.audioCtx) {
+      if (this.audioCtx.state === 'suspended') await this.audioCtx.resume();
+      return;
+    }
+    try {
+      const ctx = new AudioContext();
+      const source = ctx.createMediaElementSource(this.audio);
+      const gain = ctx.createGain();
+      gain.gain.value = this.audio.volume;
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 128;
+      analyser.smoothingTimeConstant = 0.6;
+      source.connect(gain);
+      gain.connect(analyser);
+      analyser.connect(ctx.destination);
+      ctx.onstatechange = () => {
+        if (ctx.state === 'suspended' && !this.audio.paused) ctx.resume();
+      };
+      this.audioCtx = ctx;
+      this.analyserNode = analyser;
+      this.audio.addEventListener('volumechange', () => { gain.gain.value = this.audio.volume; });
+    } catch { /* already created */ }
+  }
+
   async play(_track: Track, url: string): Promise<void> {
     this.audio.src = url;
+    this.audio.load();
+    await this.initAudioPipeline();
     try {
+      this.pendingPlay = this.audio.play();
       await Promise.race([
-        this.audio.play(),
+        this.pendingPlay,
         new Promise<void>((_, reject) => setTimeout(() => reject(new Error('playback timeout')), 15000)),
       ]);
-    } catch (e) {
+    } catch (e: unknown) {
+      if (e instanceof DOMException && e.name === 'AbortError' && !this.audio.paused) {
+        return;
+      }
       console.warn('play failed:', e);
       throw e;
     }
@@ -104,11 +138,21 @@ export class WebPlatform implements PlatformAPI {
   }
 
   async pause(): Promise<void> {
+    try { await this.pendingPlay; } catch { /* already rejected is fine */ }
     this.audio.pause();
   }
 
   async resume(): Promise<void> {
-    await this.audio.play();
+    await this.initAudioPipeline();
+    try {
+      this.pendingPlay = this.audio.play();
+      await this.pendingPlay;
+    } catch (e: unknown) {
+      if (e instanceof DOMException && e.name === 'AbortError' && !this.audio.paused) {
+        return;
+      }
+      throw e;
+    }
   }
 
   async stop(): Promise<void> {
@@ -196,6 +240,10 @@ export class WebPlatform implements PlatformAPI {
 
   getAudioElement(): HTMLAudioElement | null {
     return this.audio;
+  }
+
+  getAnalyser(): AnalyserNode | null {
+    return this.analyserNode;
   }
 }
 

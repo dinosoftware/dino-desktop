@@ -192,11 +192,25 @@ function updateDiscordPresence(track: Track | null, playing: boolean) {
   const activityType = getRpcSetting('dino_discord_rpc_activity_type', 2) as number;
   const displayType = getRpcSetting('dino_discord_rpc_display', 0) as number;
   const showTime = getRpcSetting('dino_discord_rpc_show_time', true) as boolean;
-  const showButtons = getRpcSetting('dino_discord_rpc_show_buttons', true) as boolean;
 
   const artistText = getArtistDisplay(track).text;
-  const details = track.title || '';
-  const state = playing ? (artistText || '') : `${artistText || ''} — Paused`;
+  let details = '';
+  let state = '';
+  switch (displayType) {
+    case 0:
+      details = 'Dino Desktop';
+      state = `${track.title || ''} — ${artistText || ''}`;
+      break;
+    case 1:
+      details = artistText || '';
+      state = track.title || '';
+      break;
+    default:
+      details = track.title || '';
+      state = artistText || '';
+  }
+  if (!playing) state = `${state} — Paused`;
+
   const storeState = usePlayerStore.getState();
   const startMs = showTime && playing ? Date.now() - (storeState.position * 1000) : 0;
   const endMs = showTime && playing && storeState.duration > 0 ? Date.now() + ((storeState.duration - storeState.position) * 1000) : 0;
@@ -216,10 +230,9 @@ function updateDiscordPresence(track: Track | null, playing: boolean) {
     showTimestamps: showTime && playing,
     startMs,
     endMs,
-    showButtons: showButtons && !!serverUrl,
+    showButtons: !!serverUrl,
     buttonLabel: 'Listen',
     buttonUrl: serverUrl,
-    statusDisplayType: displayType,
   }).catch((err) => { console.warn('discord rpc error:', err); });
 
   if (track.albumId && !albumImageUrlCache.has(track.albumId)) {
@@ -333,16 +346,19 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   resume: async () => {
     const platform = getPlatform();
     const { currentTrack, position } = get();
-    if (currentTrack && platform.getAudioElement()?.readyState === 0) {
-      const url = apiClient.buildStreamUrl(currentTrack.id);
-      try {
+    if (!currentTrack) return;
+
+    try {
+      const audio = platform.getAudioElement();
+      if (audio && audio.src && audio.readyState >= 2) {
+        await platform.resume();
+      } else {
+        const url = apiClient.buildStreamUrl(currentTrack.id);
         await platform.play(currentTrack, url);
         if (position > 0) await platform.seek(position);
-      } catch {
-        return;
       }
-    } else {
-      await platform.resume();
+    } catch {
+      return;
     }
     updateDiscordPresence(currentTrack, true);
     saveQueueToServer();

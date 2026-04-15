@@ -14,18 +14,18 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    const tryLoadWails = async () => {
+    const detect = async () => {
       try {
-        if (window.go?.main?.App) {
-          const { WailsPlatform } = await import('./wails');
-          setPlatform(new WailsPlatform());
+        if (window.electronAPI) {
+          const { ElectronPlatform } = await import('./electron');
+          setPlatform(new ElectronPlatform());
         }
       } catch {
-        // not in wails, use web
+        // not in desktop, use web
       }
       setReady(true);
     };
-    tryLoadWails();
+    detect();
   }, []);
 
   if (!ready) {

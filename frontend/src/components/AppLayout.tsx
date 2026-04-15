@@ -201,7 +201,7 @@ export function AppLayout({ children }: AppLayoutProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const platform = usePlatform();
-  const audioEl = platform.getAudioElement();
+  const analyser = platform.getAnalyser();
   const {
     currentTrack,
     isPlaying,
@@ -744,7 +744,7 @@ export function AppLayout({ children }: AppLayoutProps) {
               </div>
 
               <div className="mt-4 flex justify-center">
-                <AudioVisualizer audioElement={audioEl} isPlaying={isPlaying} barCount={40} barWidth={3} barGap={2} maxHeight={28} mirror opacity={0.5} />
+                <AudioVisualizer analyser={analyser} isPlaying={isPlaying} barCount={40} barWidth={3} barGap={2} maxHeight={28} mirror opacity={0.5} />
               </div>
             </div>
 
@@ -1172,7 +1172,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                </div>
 
                 <div className="mt-4 flex justify-center">
-                  <AudioVisualizer audioElement={audioEl} isPlaying={isPlaying} barCount={48} barWidth={3} barGap={2} maxHeight={32} mirror opacity={0.45} />
+                  <AudioVisualizer analyser={analyser} isPlaying={isPlaying} barCount={48} barWidth={3} barGap={2} maxHeight={32} mirror opacity={0.45} />
                </div>
              </div>
 

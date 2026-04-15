@@ -1,0 +1,64 @@
+{
+  "name": "dino-desktop",
+  "version": "1.5.0",
+  "description": "A modern OpenSubsonic music player",
+  "author": "Dino Desktop",
+  "private": true,
+  "main": "main.js",
+  "scripts": {
+    "dev": "node dev.js",
+    "build": "cd frontend && npm run build && cd .. && electron-builder",
+    "build:dir": "cd frontend && npm run build && cd .. && electron-builder --dir"
+  },
+  "devDependencies": {
+    "electron": "^36.2.0",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "com.dino.desktop",
+    "productName": "Dino Desktop",
+    "files": [
+      "main.js",
+      "preload.js",
+      "frontend/dist/**/*",
+      "node_modules/**/*"
+    ],
+    "directories": {
+      "output": "dist-electron"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "tar.gz"
+      ],
+      "category": "Audio",
+      "icon": "build/appicon.png",
+      "extraFiles": [
+        {
+          "from": "build/dino-desktop.desktop",
+          "to": "."
+        },
+        {
+          "from": "build/appicon.png",
+          "to": "dino-desktop.png"
+        }
+      ]
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "build/appicon.ico"
+    },
+    "mac": {
+      "target": "dmg",
+      "category": "public.app-category.music",
+      "icon": "build/appicon.icns"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  },
+  "dependencies": {
+    "@xhayper/discord-rpc": "^1.3.3"
+  }
+}

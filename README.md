@@ -1,10 +1,10 @@
 # Dino Desktop
 
-A modern, multi-platform [OpenSubsonic](https://opensubsonic.netlify.app/) music player built with React, Tailwind CSS, and Go (Wails).
+A modern, multi-platform [OpenSubsonic](https://opensubsonic.netlify.app/) music player built with React, Tailwind CSS, and Electron.
 
 Two build targets share one React frontend:
 - **Web** — Static SPA served behind any web server (includes Docker config)
-- **Desktop** — Native desktop app via [Wails](https://wails.io/) (Linux, macOS, Windows)
+- **Desktop** — Native desktop app via [Electron](https://www.electronjs.org/) (Linux, macOS, Windows)
 
 ## Features
 
@@ -24,9 +24,7 @@ Two build targets share one React frontend:
 
 ### Prerequisites
 
-- Node.js 18+
-- Go 1.22+
-- [Wails CLI](https://wails.io/docs/gettingstarted/installation) (for desktop)
+- Node.js 22+
 
 ### Web (local dev server)
 
@@ -38,13 +36,14 @@ npm run dev
 
 Frontend runs on `http://localhost:5173`. API requests to `music.fuge.dev` are proxied through `/api` to avoid CORS during development.
 
-### Desktop (Wails)
+### Desktop (Electron)
 
 ```bash
-wails dev
+npm install
+npm run dev
 ```
 
-This starts the Wails dev server with hot reload. The frontend is built automatically.
+This starts the Vite dev server and then launches Electron with hot reload.
 
 ## Building for Production
 
@@ -58,31 +57,33 @@ docker run -p 8080:80 dino-web
 ### Desktop
 
 ```bash
-wails build
+npm run build
 ```
 
-The binary is output to `build/bin/`.
+The output goes to `dist-electron/`.
 
 ## Project Structure
 
 ```
-├── app.go              # Wails Go backend (stubs for player, storage, Discord RPC)
-├── main.go             # Wails app entry point, embeds frontend/dist
-├── wails.json          # Wails project config
+├── main.js              # Electron main process (IPC, storage, Discord RPC, window)
+├── preload.js           # Electron preload (contextBridge for safe IPC)
+├── dev.js               # Dev script (spawns Vite + Electron)
+├── package.json         # Root package with Electron deps
 ├── frontend/
 │   ├── src/
-│   │   ├── api/        # OpenSubsonic API client and types
-│   │   ├── components/ # React components (player, context menus, visualizer)
-│   │   ├── hooks/      # Custom React hooks
-│   │   ├── lib/        # Utilities
-│   │   ├── platform/   # Platform abstraction (Web vs Wails)
-│   │   ├── screens/    # Page components (Home, Album, Artist, Search, etc.)
-│   │   └── stores/     # Zustand state (auth, player, cache)
-│   └── vite.config.ts  # Vite config with @ alias and API proxy
+│   │   ├── api/         # OpenSubsonic API client and types
+│   │   ├── components/  # React components (player, context menus, visualizer)
+│   │   ├── hooks/       # Custom React hooks
+│   │   ├── lib/         # Utilities
+│   │   ├── platform/    # Platform abstraction (Web, Electron, Wails)
+│   │   ├── screens/     # Page components (Home, Album, Artist, Search, etc.)
+│   │   └── stores/      # Zustand state (auth, player, cache)
+│   └── vite.config.ts   # Vite config with @ alias and API proxy
 ├── web/
-│   ├── Dockerfile      # Multi-stage Docker build for web deployment
-│   └── nginx.conf      # Nginx config for SPA routing
-└── AGENTS.md           # Architecture notes for AI assistants
+│   ├── Dockerfile       # Multi-stage Docker build for web deployment
+│   └── nginx.conf       # Nginx config for SPA routing
+├── .github/workflows/   # CI: build Electron binaries + Docker for Linux/Win/Mac
+└── AGENTS.md            # Architecture notes for AI assistants
 ```
 
 ## Tech Stack
@@ -90,7 +91,7 @@ The binary is output to `build/bin/`.
 | Layer | Technology |
 |-------|-----------|
 | Frontend | React 19, TypeScript, Tailwind CSS v4, Zustand |
-| Desktop | Go, Wails v2 |
+| Desktop | Electron, Node.js |
 | Audio | HTMLAudioElement, Web Audio API (AnalyserNode) |
 | Icons | Lucide React |
 | Web Server | Nginx (Docker) |

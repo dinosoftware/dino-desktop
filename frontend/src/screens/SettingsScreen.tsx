@@ -80,9 +80,6 @@ export function SettingsScreen() {
   const [discordRpcShowTime, setDiscordRpcShowTime] = useState(
     getSetting('dino_discord_rpc_show_time', true)
   );
-  const [discordRpcShowButtons, setDiscordRpcShowButtons] = useState(
-    getSetting('dino_discord_rpc_show_buttons', true)
-  );
   const [discordRpcImagePriority, setDiscordRpcImagePriority] = useState<string>(
     getSetting('dino_discord_rpc_image_priority', 'server')
   );
@@ -154,13 +151,6 @@ export function SettingsScreen() {
     const next = !discordRpcShowTime;
     setDiscordRpcShowTime(next);
     setSetting('dino_discord_rpc_show_time', next);
-    refreshDiscordPresence();
-  };
-
-  const handleDiscordRpcShowButtonsToggle = () => {
-    const next = !discordRpcShowButtons;
-    setDiscordRpcShowButtons(next);
-    setSetting('dino_discord_rpc_show_buttons', next);
     refreshDiscordPresence();
   };
 
@@ -464,7 +454,6 @@ export function SettingsScreen() {
               </div>
 
               <ToggleRow label="Show Playback Time" description="Display elapsed/remaining time on Discord" checked={discordRpcShowTime} onChange={handleDiscordRpcShowTimeToggle} />
-              <ToggleRow label="Show Buttons" description="Show a 'Listen' button linking to your server" checked={discordRpcShowButtons} onChange={handleDiscordRpcShowButtonsToggle} />
               <ToggleRow label="Show When Paused" description="Keep presence visible while paused" checked={discordRpcPaused} onChange={handleDiscordRpcPausedToggle} />
 
               <div>
@@ -525,7 +514,7 @@ export function SettingsScreen() {
           <h2 className="text-lg font-semibold">About</h2>
         </div>
         <div className="p-4 rounded-xl border bg-card text-sm text-muted-foreground space-y-1">
-          <p className="font-medium text-foreground">Dino Desktop v1.1.1</p>
+          <p className="font-medium text-foreground">Dino Desktop v{typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'dev'}</p>
           <p>A modern music player for OpenSubsonic servers</p>
           <p>Connected to {apiClient.getServerUrl() || 'no server'}</p>
         </div>

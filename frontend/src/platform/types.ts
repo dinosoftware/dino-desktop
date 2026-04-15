@@ -77,6 +77,7 @@ export interface PlatformAPI {
   setMediaMetadata(track: Track, artworkUrl?: string): Promise<void>;
 
   getAudioElement(): HTMLAudioElement | null;
+  getAnalyser(): AnalyserNode | null;
 
   updateDiscordPresence?(args: {
     enabled: boolean;
@@ -94,7 +95,6 @@ export interface PlatformAPI {
     showButtons: boolean;
     buttonLabel: string;
     buttonUrl: string;
-    statusDisplayType: number;
   }): Promise<void>;
   clearDiscordPresence?(): Promise<void>;
   connectDiscord?(clientId: string): Promise<void>;

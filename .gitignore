@@ -2,9 +2,11 @@
 build/*
 !build/appicon.*
 frontend/dist/
+dist-electron/
 
 # Dependencies
 frontend/node_modules/
+node_modules/
 
 # IDE
 .vscode/

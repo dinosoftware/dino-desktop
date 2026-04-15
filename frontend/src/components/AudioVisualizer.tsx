@@ -1,7 +1,7 @@
 import { useRef, useEffect } from 'react';
 
 interface AudioVisualizerProps {
-  audioElement: HTMLAudioElement | null;
+  analyser: AnalyserNode | null;
   isPlaying: boolean;
   className?: string;
   barCount?: number;
@@ -14,11 +14,8 @@ interface AudioVisualizerProps {
   mirror?: boolean;
 }
 
-type Entry = { analyser: AnalyserNode; gain: GainNode; ctx: AudioContext };
-const wired = new WeakMap<HTMLAudioElement, Entry>();
-
 export function AudioVisualizer({
-  audioElement,
+  analyser,
   isPlaying,
   className,
   barCount = 48,
@@ -33,36 +30,8 @@ export function AudioVisualizer({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rafRef = useRef<number>(0);
   const barsRef = useRef<Float32Array>(new Float32Array(barCount).fill(minHeight));
-
-  useEffect(() => {
-    if (!audioElement) return;
-
-    const onPlay = () => {
-      if (wired.has(audioElement)) {
-        const e = wired.get(audioElement)!;
-        if (e.ctx.state === 'suspended') e.ctx.resume();
-        return;
-      }
-      try {
-        const ctx = new AudioContext();
-        const source = ctx.createMediaElementSource(audioElement);
-        const gain = ctx.createGain();
-        gain.gain.value = audioElement.volume;
-        const analyser = ctx.createAnalyser();
-        analyser.fftSize = 128;
-        analyser.smoothingTimeConstant = 0.6;
-        source.connect(gain);
-        gain.connect(analyser);
-        analyser.connect(ctx.destination);
-        wired.set(audioElement, { analyser, gain, ctx });
-        const sync = () => { gain.gain.value = audioElement.volume; };
-        audioElement.addEventListener('volumechange', sync);
-      } catch {}
-    };
-
-    audioElement.addEventListener('play', onPlay);
-    return () => audioElement.removeEventListener('play', onPlay);
-  }, [audioElement]);
+  const isPlayingRef = useRef(isPlaying);
+  useEffect(() => { isPlayingRef.current = isPlaying; });
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -91,12 +60,12 @@ export function AudioVisualizer({
       rafRef.current = requestAnimationFrame(draw);
       c.clearRect(0, 0, totalWidth, totalHeight);
 
-      const entry = audioElement ? wired.get(audioElement) : null;
+      const playing = isPlayingRef.current;
 
-      if (entry && isPlaying) {
-        const data = new Uint8Array(entry.analyser.frequencyBinCount);
-        entry.analyser.getByteFrequencyData(data);
-        const step = Math.max(1, Math.floor(entry.analyser.frequencyBinCount / barCount));
+      if (analyser && playing) {
+        const data = new Uint8Array(analyser.frequencyBinCount);
+        analyser.getByteFrequencyData(data);
+        const step = Math.max(1, Math.floor(analyser.frequencyBinCount / barCount));
         for (let i = 0; i < barCount; i++) {
           const val = data[i * step] / 255;
           const boosted = Math.pow(val, 0.7);
@@ -136,7 +105,7 @@ export function AudioVisualizer({
 
     rafRef.current = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(rafRef.current);
-  }, [barCount, barWidth, barGap, minHeight, maxHeight, color, opacity, mirror, isPlaying, audioElement]);
+  }, [barCount, barWidth, barGap, minHeight, maxHeight, color, opacity, mirror, analyser]);
 
   return <canvas ref={canvasRef} className={className} />;
 }
