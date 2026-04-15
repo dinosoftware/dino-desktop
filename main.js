@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, Menu } = require('electron');
 const path = require('path');
 const fs = require('fs');
 let discordRpc = null;
@@ -110,6 +110,7 @@ function createWindow() {
   }
 
   mainWindow.on('closed', () => { mainWindow = null; });
+  mainWindow.setMenu(null);
 }
 
 app.whenReady().then(() => {
