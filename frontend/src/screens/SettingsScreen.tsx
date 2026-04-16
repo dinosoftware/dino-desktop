@@ -5,7 +5,7 @@ import { Sun, Moon, Monitor, LogOut, Server, Trash2, Wifi, Speaker, Palette, Inf
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 import { apiClient } from '@/api/client';
-import { refreshDiscordPresence } from '@/stores/playerStore';
+import { refreshDiscordPresence, connectDiscordRPC, refreshWakeLock } from '@/stores/playerStore';
 
 type StreamingQuality = '0' | '64' | '96' | '128' | '192' | '256' | '320' | 'max';
 type StreamingFormat = 'raw' | 'mp3' | 'opus' | 'aac' | 'flac';
@@ -62,6 +62,12 @@ export function SettingsScreen() {
   const [wakeLock, setWakeLock] = useState(
     getSetting('dino_wake_lock', false)
   );
+  const [autoExtend, setAutoExtend] = useState(
+    getSetting('dino_auto_extend', true)
+  );
+  const [autoExtendThreshold, setAutoExtendThreshold] = useState<number>(
+    getSetting('dino_auto_extend_threshold', 1)
+  );
   const [discordRpc, setDiscordRpc] = useState(
     getSetting('dino_discord_rpc', false)
   );
@@ -113,13 +119,26 @@ export function SettingsScreen() {
     const next = !wakeLock;
     setWakeLock(next);
     setSetting('dino_wake_lock', next);
+    refreshWakeLock();
+  };
+
+  const handleAutoExtendToggle = () => {
+    const next = !autoExtend;
+    setAutoExtend(next);
+    setSetting('dino_auto_extend', next);
+  };
+
+  const handleAutoExtendThreshold = (v: number) => {
+    setAutoExtendThreshold(v);
+    setSetting('dino_auto_extend_threshold', v);
   };
 
   const handleDiscordRpcToggle = () => {
     const next = !discordRpc;
     setDiscordRpc(next);
     setSetting('dino_discord_rpc', next);
-    refreshDiscordPresence();
+    if (next) connectDiscordRPC().then(() => refreshDiscordPresence());
+    else refreshDiscordPresence();
   };
 
   const handleDiscordRpcPausedToggle = () => {
@@ -132,13 +151,13 @@ export function SettingsScreen() {
   const handleDiscordRpcDisplay = (v: number) => {
     setDiscordRpcDisplay(v);
     setSetting('dino_discord_rpc_display', v);
-    refreshDiscordPresence();
+    connectDiscordRPC().then(() => refreshDiscordPresence());
   };
 
   const handleDiscordRpcClientId = (v: string) => {
     setDiscordRpcClientId(v);
     setSetting('dino_discord_rpc_client_id', v);
-    refreshDiscordPresence();
+    connectDiscordRPC().then(() => refreshDiscordPresence());
   };
 
   const handleDiscordRpcActivityType = (v: number) => {
@@ -157,13 +176,13 @@ export function SettingsScreen() {
   const handleDiscordRpcImagePriority = (v: string) => {
     setDiscordRpcImagePriority(v);
     setSetting('dino_discord_rpc_image_priority', v);
-    refreshDiscordPresence();
+    refreshDiscordPresence(true);
   };
 
   const handleDiscordRpcLastfmKey = (v: string) => {
     setDiscordRpcLastfmKey(v);
     setSetting('dino_discord_rpc_lastfm_key', v);
-    refreshDiscordPresence();
+    refreshDiscordPresence(true);
   };
 
   const [showAddServer, setShowAddServer] = useState(false);
@@ -407,6 +426,29 @@ export function SettingsScreen() {
             checked={wakeLock}
             onChange={handleWakeLockToggle}
           />
+          <ToggleRow
+            label="Auto-extend queue"
+            description="Add similar songs when queue is running low"
+            checked={autoExtend}
+            onChange={handleAutoExtendToggle}
+          />
+          {autoExtend && (
+            <div className="pl-1 border-l-2 border-primary">
+              <label className="text-sm font-medium block mb-1.5">Extend when fewer than</label>
+              <div className="grid grid-cols-4 gap-2">
+                {[
+                  { value: 1, label: '1 song' },
+                  { value: 2, label: '2 songs' },
+                  { value: 3, label: '3 songs' },
+                  { value: 5, label: '5 songs' },
+                ].map((opt) => (
+                  <SelectableButton key={opt.value} selected={autoExtendThreshold === opt.value} onClick={() => handleAutoExtendThreshold(opt.value)}>
+                    {opt.label}
+                  </SelectableButton>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </section>
 
@@ -438,13 +480,13 @@ export function SettingsScreen() {
               </div>
 
               <div>
-                <label className="text-sm font-medium block mb-1.5">Display Format</label>
-                <p className="text-xs text-muted-foreground mb-2">Controls which line shows the "Listening to" prefix</p>
+                <label className="text-sm font-medium block mb-1.5">Status Display</label>
+                <p className="text-xs text-muted-foreground mb-2">Controls which line gets the "Listening to" / "Playing" prefix</p>
                 <div className="grid grid-cols-3 gap-2">
                   {[
                     { value: 0, label: 'App Name' },
-                    { value: 2, label: 'Track' },
                     { value: 1, label: 'Artist' },
+                    { value: 2, label: 'Track' },
                   ].map((opt) => (
                     <SelectableButton key={opt.value} selected={discordRpcDisplay === opt.value} onClick={() => handleDiscordRpcDisplay(opt.value)}>
                       {opt.label}

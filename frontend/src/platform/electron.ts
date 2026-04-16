@@ -303,6 +303,7 @@ export class ElectronPlatform implements PlatformAPI {
     activityType: number;
     details: string;
     state: string;
+    statusDisplayType: number;
     largeImage: string;
     largeText: string;
     smallImage: string;

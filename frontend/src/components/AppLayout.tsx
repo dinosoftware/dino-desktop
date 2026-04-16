@@ -33,6 +33,7 @@ import {
   Download,
   Upload,
   MoreVertical,
+  GripVertical,
 } from 'lucide-react';
 import { apiClient } from '@/api/client';
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
@@ -240,6 +241,8 @@ export function AppLayout({ children }: AppLayoutProps) {
   const [userInteracting, setUserInteracting] = useState(false);
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
   const [windowHeight, setWindowHeight] = useState(window.innerHeight);
+  const [dropdownDragIdx, setDropdownDragIdx] = useState<number | null>(null);
+  const [dropdownDragOverIdx, setDropdownDragOverIdx] = useState<number | null>(null);
   const inactivityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const controlsVisibleRef = useRef(true);
   const lyricsRef = useRef<HTMLDivElement>(null);
@@ -522,7 +525,7 @@ export function AppLayout({ children }: AppLayoutProps) {
       )} style={{ height: isPlayerOpen ? '100vh' : 'calc(100vh - 80px)' }}>
         <div className={cn('border-b border-border flex items-center', sidebarCollapsed ? 'p-2 justify-center' : 'p-4 justify-between')}>
           <div className="flex items-center gap-2.5">
-            <img src="/icon.png" alt="Dino" className={cn('rounded-lg', sidebarCollapsed ? 'w-7 h-7' : 'w-8 h-8')} />
+            <img src="./icon.png" alt="Dino" className={cn('rounded-lg', sidebarCollapsed ? 'w-7 h-7' : 'w-8 h-8')} />
             {!sidebarCollapsed && <h1 className="text-xl font-bold tracking-tight">Dino</h1>}
           </div>
           <button
@@ -650,7 +653,7 @@ export function AppLayout({ children }: AppLayoutProps) {
 
           <div className={cn("relative z-10 flex-1 flex min-h-0 px-4 sm:px-6 pb-4 sm:pb-6", compactExpanded ? "flex-row gap-4" : "flex-col lg:flex-row")}>
             <div className={cn("flex flex-col items-center justify-center", compactExpanded ? "w-auto flex-shrink-0 py-2" : "flex-1 lg:w-1/2 py-2 lg:py-0")}>
-              <div className={cn("rounded-2xl shadow-2xl overflow-hidden flex-shrink-0", compactExpanded ? "w-28 h-28 mb-2" : "w-36 h-36 sm:w-48 sm:h-48 md:w-56 md:h-56 lg:w-64 lg:h-64 mb-4 lg:mb-6")} style={{ backgroundColor: 'var(--cover-container-bg)' }}>
+              <div className={cn("rounded-2xl shadow-2xl overflow-hidden flex-shrink-0", compactExpanded ? "w-28 h-28 mb-2" : "w-36 h-36 sm:w-48 sm:h-48 md:w-56 md:h-56 lg:w-64 lg:h-64 xl:w-80 xl:h-80 2xl:w-96 2xl:h-96 mb-4 lg:mb-6")} style={{ backgroundColor: 'var(--cover-container-bg)' }}>
                 {fullPlayerCoverUrl ? (
                   <img src={fullPlayerCoverUrl} alt={currentTrack.title} className="w-full h-full object-cover" />
                 ) : (
@@ -660,8 +663,8 @@ export function AppLayout({ children }: AppLayoutProps) {
                 )}
               </div>
 
-              <div className="text-center mb-4 lg:mb-6 w-full max-w-xs mx-auto">
-                <MarqueeText className="text-lg sm:text-xl font-bold mb-1">{currentTrack.title}</MarqueeText>
+              <div className="text-center mb-4 lg:mb-6 w-full max-w-xs xl:max-w-sm 2xl:max-w-md mx-auto">
+                <MarqueeText className="text-lg sm:text-xl xl:text-2xl font-bold mb-1">{currentTrack.title}</MarqueeText>
                 <ArtistLink track={currentTrack} onNavigate={() => setPlayerMode('mini')} fs={false} />
                 {currentTrack.album && (
                   <MarqueeText className="text-xs sm:text-sm mt-0.5">
@@ -676,7 +679,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                 )}
               </div>
 
-              <div className="w-full max-w-xs mx-auto mb-4 lg:mb-6">
+              <div className="w-full max-w-xs xl:max-w-sm 2xl:max-w-md mx-auto mb-4 lg:mb-6">
                 <SliderBar
                   value={isSeeking ? seekValue : position}
                   max={duration || 1}
@@ -697,12 +700,12 @@ export function AppLayout({ children }: AppLayoutProps) {
                    </div>
               </div>
 
-              <div className="flex items-center gap-3 sm:gap-4 mb-4">
+              <div className="flex items-center gap-3 sm:gap-4 xl:gap-5 mb-4">
                 <ControlButton onClick={toggleShuffle} active={shuffle} icon={<Shuffle className="h-5 w-5" />} size="lg" />
                 <ControlButton onClick={previous} icon={<SkipBack className="h-5 w-5 sm:h-6 sm:w-6" />} size="lg" />
                 <button
                   onClick={() => isPlaying ? pause() : resume()}
-                  className="h-12 w-12 sm:h-14 sm:w-14 rounded-full flex items-center justify-center transition-all duration-200 active:scale-95"
+                  className="h-12 w-12 sm:h-14 sm:w-14 xl:h-16 xl:w-16 rounded-full flex items-center justify-center transition-all duration-200 active:scale-95"
                   style={{ backgroundColor: 'var(--toggle-on)', color: 'var(--toggle-on-knob)', boxShadow: '0 4px 14px rgba(0,0,0,0.3)' }}
                 >
                   {isPlaying ? <Pause className="h-5 w-5 sm:h-6 sm:w-6" /> : <Play className="h-5 w-5 sm:h-6 sm:w-6 ml-0.5" />}
@@ -797,7 +800,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                   apiClient.savePlayQueue(ids, currentTrack?.id, Math.floor(position * 1000)).catch(() => {});
                 }}
                 onGetQueue={() => loadQueueFromServer()}
-                onRetryLyrics={() => { fetchingLyricsForId.current = null; setLyrics([]); setLyricsLoading(true); apiClient.getLyricsBySongId(currentTrack!.id).then(setLyrics).catch(() => {}); setLyricsLoading(false); }}
+                onRetryLyrics={() => { fetchingLyricsForId.current = null; setLyrics([]); setLyricsLoading(true); apiClient.getLyricsBySongId(currentTrack!.id).then((data) => { setLyrics(data); setLyricsLoading(false); }).catch(() => { setLyrics([]); setLyricsLoading(false); }); }}
                 onQueueScrollRef={panelQueueScrollRef}
               />
             </div>
@@ -988,11 +991,26 @@ export function AppLayout({ children }: AppLayoutProps) {
                     <div
                       data-queue-id={track.id}
                       onClick={() => handlePlayFromQueue(idx)}
+                      draggable
+                      onDragStart={(e) => { setDropdownDragIdx(idx); e.dataTransfer.effectAllowed = 'move'; }}
+                      onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDropdownDragOverIdx(idx); }}
+                      onDragLeave={() => setDropdownDragOverIdx(null)}
+                      onDrop={() => {
+                        if (dropdownDragIdx !== null && dropdownDragIdx !== idx) {
+                          usePlayerStore.getState().moveInQueue(dropdownDragIdx, idx);
+                        }
+                        setDropdownDragIdx(null);
+                        setDropdownDragOverIdx(null);
+                      }}
+                      onDragEnd={() => { setDropdownDragIdx(null); setDropdownDragOverIdx(null); }}
                       className={cn(
                         'flex items-center gap-3 px-3 py-2 rounded-lg text-sm cursor-pointer transition-all duration-150',
-                        isCurrent ? 'bg-primary/15 border border-primary/20' : 'hover:bg-accent'
+                        isCurrent ? 'bg-primary/15 border border-primary/20' : 'hover:bg-accent',
+                        dropdownDragIdx === idx && 'opacity-40',
+                        dropdownDragOverIdx === idx && dropdownDragIdx !== idx && 'border-t-2 border-primary',
                       )}
                     >
+                      <span className="cursor-grab text-muted-foreground hover:text-foreground flex-shrink-0" onClick={(e) => e.stopPropagation()}><GripVertical className="h-3.5 w-3.5" /></span>
                       <span className={cn('w-5 text-center text-xs font-medium', isCurrent ? 'text-primary' : 'text-muted-foreground')}>{idx + 1}</span>
                       <div className="h-9 w-9 rounded bg-muted flex items-center justify-center overflow-hidden flex-shrink-0">
                         {track.coverArt ? <img src={apiClient.buildCoverArtUrl(track.coverArt, 60)} alt={track.title} className="w-full h-full object-cover" /> : <Music className="h-3.5 w-3.5 text-muted-foreground" />}
@@ -1076,7 +1094,7 @@ export function AppLayout({ children }: AppLayoutProps) {
 
           <div className="relative z-10 flex-1 flex min-h-0 px-4 sm:px-6 pb-4 sm:pb-6 flex-col lg:flex-row">
             <div className="flex-1 lg:w-1/2 flex flex-col items-center justify-center lg:py-0">
-                <div className="w-40 h-40 sm:w-56 sm:h-56 md:w-64 md:h-64 lg:w-72 lg:h-72 rounded-2xl shadow-2xl overflow-hidden mb-4 lg:mb-6 flex-shrink-0" style={{ backgroundColor: 'var(--cover-container-bg)' }}>
+                <div className="w-40 h-40 sm:w-56 sm:h-56 md:w-64 md:h-64 lg:w-72 lg:h-72 xl:w-80 xl:h-80 2xl:w-96 2xl:h-96 rounded-2xl shadow-2xl overflow-hidden mb-4 lg:mb-6 flex-shrink-0" style={{ backgroundColor: 'var(--cover-container-bg)' }}>
                   {fullPlayerCoverUrl ? (
                   <img src={fullPlayerCoverUrl} alt={currentTrack.title} className="w-full h-full object-cover" />
                 ) : (
@@ -1086,8 +1104,8 @@ export function AppLayout({ children }: AppLayoutProps) {
                 )}
               </div>
 
-                <div className="text-center mb-4 lg:mb-6 w-full max-w-xs mx-auto">
-                  <MarqueeText className="text-lg sm:text-xl font-bold mb-1">{currentTrack.title}</MarqueeText>
+                <div className="text-center mb-4 lg:mb-6 w-full max-w-xs xl:max-w-sm 2xl:max-w-md mx-auto">
+                  <MarqueeText className="text-lg sm:text-xl xl:text-2xl font-bold mb-1">{currentTrack.title}</MarqueeText>
                   <ArtistLink track={currentTrack} onNavigate={() => setPlayerMode('mini')} fs />
                   {currentTrack.album && (
                     <MarqueeText className="text-xs sm:text-sm mt-0.5">
@@ -1102,7 +1120,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                   )}
                 </div>
 
-                  <div className="w-full max-w-xs mx-auto mb-4 lg:mb-6">
+                  <div className="w-full max-w-xs xl:max-w-sm 2xl:max-w-md mx-auto mb-4 lg:mb-6">
                     <SliderBar
                       value={isSeeking ? seekValue : position}
                       max={duration || 1}
@@ -1124,12 +1142,12 @@ export function AppLayout({ children }: AppLayoutProps) {
                 </div>
 
               <div className={cn('flex flex-col items-center transition-opacity duration-700', controlsVisible ? 'opacity-100' : 'opacity-0 pointer-events-none')}>
-                <div className="flex items-center gap-3 sm:gap-4 mb-3">
+                <div className="flex items-center gap-3 sm:gap-4 xl:gap-5 mb-3">
                   <ControlButton onClick={toggleShuffle} active={shuffle} icon={<Shuffle className="h-5 w-5" />} size="lg" />
                   <ControlButton onClick={previous} icon={<SkipBack className="h-5 w-5 sm:h-6 sm:w-6" />} size="lg" />
                   <button
                     onClick={() => isPlaying ? pause() : resume()}
-                    className="h-12 w-12 sm:h-14 sm:w-14 rounded-full flex items-center justify-center transition-all duration-200 active:scale-95"
+                    className="h-12 w-12 sm:h-14 sm:w-14 xl:h-16 xl:w-16 rounded-full flex items-center justify-center transition-all duration-200 active:scale-95"
                     style={{ backgroundColor: 'var(--toggle-on)', color: 'var(--toggle-on-knob)', boxShadow: '0 4px 14px rgba(0,0,0,0.3)' }}
                   >
                     {isPlaying ? <Pause className="h-5 w-5 sm:h-6 sm:w-6" /> : <Play className="h-5 w-5 sm:h-6 sm:w-6 ml-0.5" />}
@@ -1225,7 +1243,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                   apiClient.savePlayQueue(ids, currentTrack?.id, Math.floor(position * 1000)).catch(() => {});
                 }}
                 onGetQueue={() => loadQueueFromServer()}
-                onRetryLyrics={() => { fetchingLyricsForId.current = null; setLyrics([]); setLyricsLoading(true); apiClient.getLyricsBySongId(currentTrack!.id).then(setLyrics).catch(() => {}); setLyricsLoading(false); }}
+                onRetryLyrics={() => { fetchingLyricsForId.current = null; setLyrics([]); setLyricsLoading(true); apiClient.getLyricsBySongId(currentTrack!.id).then((data) => { setLyrics(data); setLyricsLoading(false); }).catch(() => { setLyrics([]); setLyricsLoading(false); }); }}
                 onQueueScrollRef={panelQueueScrollRef}
                 portalTarget={fullPlayerRef.current}
               />
@@ -1351,6 +1369,8 @@ function PlayerRightPanel({
     ? { backgroundColor: isDark ? 'rgba(10, 10, 15, 0.75)' : 'rgba(255, 255, 255, 0.75)' }
     : {};
   const borderClr = 'border-foreground/10';
+  const [panelDragIdx, setPanelDragIdx] = useState<number | null>(null);
+  const [panelDragOverIdx, setPanelDragOverIdx] = useState<number | null>(null);
 
   return (
     <div className={cn('flex-1 rounded-xl overflow-hidden flex flex-col border', panelBg)} style={panelBgStyle}>
@@ -1393,13 +1413,28 @@ function PlayerRightPanel({
                   <div
                     data-queue-id={track.id}
                     onClick={() => handlePlayFromQueue(idx)}
+                    draggable
+                    onDragStart={(e) => { setPanelDragIdx(idx); e.dataTransfer.effectAllowed = 'move'; }}
+                    onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setPanelDragOverIdx(idx); }}
+                    onDragLeave={() => setPanelDragOverIdx(null)}
+                    onDrop={() => {
+                      if (panelDragIdx !== null && panelDragIdx !== idx) {
+                        usePlayerStore.getState().moveInQueue(panelDragIdx, idx);
+                      }
+                      setPanelDragIdx(null);
+                      setPanelDragOverIdx(null);
+                    }}
+                    onDragEnd={() => { setPanelDragIdx(null); setPanelDragOverIdx(null); }}
                     className={cn(
                       'flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm cursor-pointer transition-all duration-150',
                       isCurrent
                         ? fs ? 'bg-foreground/15 border border-foreground/20' : 'bg-primary/15 border border-primary/20'
-                        : fs ? 'hover:bg-foreground/10' : 'hover:bg-accent'
+                        : fs ? 'hover:bg-foreground/10' : 'hover:bg-accent',
+                      panelDragIdx === idx && 'opacity-40',
+                      panelDragOverIdx === idx && panelDragIdx !== idx && 'border-t-2 border-primary',
                     )}
                   >
+                    <span className={cn('cursor-grab flex-shrink-0', fs ? 'text-foreground/30 hover:text-foreground/60' : 'text-muted-foreground hover:text-foreground')} onClick={(e) => e.stopPropagation()}><GripVertical className="h-3.5 w-3.5" /></span>
                     <span className={cn('w-4 text-center text-[10px] tabular-nums', isCurrent ? (fs ? 'text-foreground' : 'text-primary') : (fs ? 'text-foreground/40' : 'text-muted-foreground'))}>{idx + 1}</span>
                     <div className={cn('h-8 w-8 rounded flex items-center justify-center overflow-hidden flex-shrink-0', fs ? 'bg-foreground/10' : 'bg-muted/50')}>
                       {track.coverArt ? <img src={apiClient.buildCoverArtUrl(track.coverArt, 60)} alt={track.title} className="w-full h-full object-cover" /> : <Music className={cn('h-3 w-3', fs ? 'text-foreground/30' : 'text-muted-foreground')} />}

@@ -32,6 +32,7 @@ interface PlayerState {
   addToQueue: (tracks: Track[]) => void;
   addNext: (tracks: Track[]) => void;
   removeFromQueue: (index: number) => void;
+  moveInQueue: (fromIndex: number, toIndex: number) => void;
   clearQueue: () => void;
   setPosition: (position: number) => void;
   setDuration: (duration: number) => void;
@@ -56,7 +57,6 @@ export const initializePlayerStore = (platform: ReturnType<typeof usePlatform>) 
 
 let retryCount = 0;
 const MAX_RETRIES = 3;
-const AUTO_EXTEND_THRESHOLD = 3;
 let scrobbleTrackId: string | null = null;
 let scrobbleSubmitted = false;
 let wakeLockRef: WakeLockSentinel | null = null;
@@ -67,7 +67,7 @@ async function requestWakeLock() {
     if (wakeLockRef) return;
     wakeLockRef = await navigator.wakeLock.request('screen');
     wakeLockRef.addEventListener('release', () => { wakeLockRef = null; });
-  } catch {}
+  } catch { /* not supported or denied */ }
 }
 
 async function releaseWakeLock() {
@@ -78,10 +78,32 @@ async function releaseWakeLock() {
 }
 
 async function updateWakeLock(isPlaying: boolean) {
+  ensureWakeLockListener();
   const enabled = getRpcSetting('dino_wake_lock', false);
   if (!enabled) { await releaseWakeLock(); return; }
   if (isPlaying) { await requestWakeLock(); }
   else { await releaseWakeLock(); }
+}
+
+export function refreshWakeLock() {
+  const { isPlaying } = usePlayerStore.getState();
+  updateWakeLock(isPlaying);
+}
+
+function setupWakeLockVisibilityListener() {
+  document.addEventListener('visibilitychange', async () => {
+    if (document.visibilityState === 'visible') {
+      const { isPlaying } = usePlayerStore.getState();
+      if (isPlaying) await requestWakeLock();
+    }
+  });
+}
+
+let wakeLockListenerSetup = false;
+function ensureWakeLockListener() {
+  if (wakeLockListenerSetup) return;
+  wakeLockListenerSetup = true;
+  setupWakeLockVisibilityListener();
 }
 
 function checkScrobbleThreshold(position: number, duration: number) {
@@ -108,8 +130,13 @@ async function autoExtendQueue() {
   const state = usePlayerStore.getState();
   const { queue, queueIndex, currentTrack } = state;
   if (!currentTrack) return;
+
+  const autoExtend = getRpcSetting('dino_auto_extend', true) as boolean;
+  if (!autoExtend) return;
+
+  const threshold = getRpcSetting('dino_auto_extend_threshold', 1) as number;
   const remaining = queue.length - queueIndex - 1;
-  if (remaining >= AUTO_EXTEND_THRESHOLD) return;
+  if (remaining >= threshold) return;
 
   try {
     const similar = await apiClient.getSimilarSongs(currentTrack.id, 10);
@@ -156,21 +183,99 @@ function getRpcSetting(key: string, fallback: unknown): unknown {
   try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; } catch { return fallback; }
 }
 
+async function fetchLastfmAlbumArt(artist: string, album: string): Promise<string> {
+  const apiKey = getRpcSetting('dino_discord_rpc_lastfm_key', '') as string;
+  if (!apiKey) return '';
+  try {
+    const url = `https://ws.audioscrobbler.com/2.0/?method=album.getinfo&api_key=${apiKey}&artist=${encodeURIComponent(artist)}&album=${encodeURIComponent(album)}&format=json`;
+    const res = await fetch(url);
+    const data = await res.json();
+    const images = data?.album?.image;
+    if (Array.isArray(images)) {
+      const large = images.find((img: { size: string }) => img.size === 'extralarge');
+      if (large?.['#text']) return large['#text'];
+      const last = images[images.length - 1];
+      if (last?.['#text']) return last['#text'];
+    }
+    return '';
+  } catch {
+    return '';
+  }
+}
+
 const albumImageUrlCache = new Map<string, string>();
 
-function prefetchAlbumImageUrl(albumId: string | undefined) {
+let serverPublicCache: boolean | null = null;
+
+function isServerPubliclyReachable(): boolean {
+  if (serverPublicCache !== null) return serverPublicCache;
+  const serverUrl = apiClient.getServerUrl();
+  if (!serverUrl || serverUrl === '/') { serverPublicCache = false; return false; }
+  try {
+    const url = new URL(serverUrl);
+    const h = url.hostname;
+    if (h === 'localhost' || h === '127.0.0.1' || h === '::1' || h.endsWith('.local')) {
+      serverPublicCache = false;
+      return false;
+    }
+    if (/^10\./.test(h) || /^172\.(1[6-9]|2[0-9]|3[01])\./.test(h) || /^192\.168\./.test(h)) {
+      serverPublicCache = false;
+      return false;
+    }
+    serverPublicCache = true;
+    return true;
+  } catch {
+    serverPublicCache = false;
+    return false;
+  }
+}
+
+export function resetServerReachabilityCache() {
+  serverPublicCache = null;
+}
+
+function prefetchAlbumImageUrl(albumId: string | undefined, track?: Track | null) {
   if (!albumId || albumImageUrlCache.has(albumId)) return;
   albumImageUrlCache.set(albumId, '');
-  apiClient.getAlbumInfo2(albumId).then((info) => {
+
+  const priority = getRpcSetting('dino_discord_rpc_image_priority', 'server') as string;
+  const serverPublic = isServerPubliclyReachable();
+
+  const tryServer = async (): Promise<string> => {
+    const info = await apiClient.getAlbumInfo2(albumId);
     const url = info?.largeImageUrl || '';
-    albumImageUrlCache.set(albumId, url);
-    if (url) {
-      const { currentTrack, isPlaying } = usePlayerStore.getState();
-      if (currentTrack?.albumId === albumId) {
-        updateDiscordPresence(currentTrack, isPlaying);
-      }
+    if (url && serverPublic) return url;
+    if (url && !serverPublic) {
+      try { const u = new URL(url); if (u.protocol === 'https:' && !/^(localhost|127\.0\.0\.1|::1|10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.)/.test(u.hostname)) return url; } catch { /* ignore */ }
     }
-  }).catch(() => {});
+    return '';
+  };
+
+  const tryLastfm = async (): Promise<string> => {
+    if (!track?.artist || !track?.album) return '';
+    return fetchLastfmAlbumArt(track.artist, track.album);
+  };
+
+  (async () => {
+    try {
+      let url = '';
+      const useLastfmFirst = priority === 'lastfm' || !serverPublic;
+      if (useLastfmFirst) {
+        url = await tryLastfm();
+        if (!url) url = await tryServer();
+      } else {
+        url = await tryServer();
+        if (!url) url = await tryLastfm();
+      }
+      albumImageUrlCache.set(albumId, url);
+      if (url) {
+        const { currentTrack, isPlaying } = usePlayerStore.getState();
+        if (currentTrack?.albumId === albumId) {
+          updateDiscordPresence(currentTrack, isPlaying);
+        }
+      }
+    } catch { /* ignore */ }
+  })();
 }
 
 function updateDiscordPresence(track: Track | null, playing: boolean) {
@@ -194,21 +299,11 @@ function updateDiscordPresence(track: Track | null, playing: boolean) {
   const showTime = getRpcSetting('dino_discord_rpc_show_time', true) as boolean;
 
   const artistText = getArtistDisplay(track).text;
-  let details = '';
-  let state = '';
-  switch (displayType) {
-    case 0:
-      details = 'Dino Desktop';
-      state = `${track.title || ''} — ${artistText || ''}`;
-      break;
-    case 1:
-      details = artistText || '';
-      state = track.title || '';
-      break;
-    default:
-      details = track.title || '';
-      state = artistText || '';
-  }
+  const details = track.title || '';
+  let state = artistText || '';
+
+  const statusDisplayType = displayType === 1 ? 1 : displayType === 2 ? 2 : 0;
+
   if (!playing) state = `${state} — Paused`;
 
   const storeState = usePlayerStore.getState();
@@ -223,6 +318,7 @@ function updateDiscordPresence(track: Track | null, playing: boolean) {
     activityType,
     details,
     state,
+    statusDisplayType,
     largeImage: coverUrl,
     largeText: track.album || '',
     smallImage: '',
@@ -236,7 +332,7 @@ function updateDiscordPresence(track: Track | null, playing: boolean) {
   }).catch((err) => { console.warn('discord rpc error:', err); });
 
   if (track.albumId && !albumImageUrlCache.has(track.albumId)) {
-    prefetchAlbumImageUrl(track.albumId);
+    prefetchAlbumImageUrl(track.albumId, track);
   }
 }
 
@@ -248,17 +344,19 @@ function saveQueueToServer() {
   apiClient.savePlayQueue(ids, currentTrack?.id, Math.floor(position * 1000)).catch(() => {});
 }
 
-export function refreshDiscordPresence() {
+export function refreshDiscordPresence(clearImageCache = false) {
+  if (clearImageCache) { albumImageUrlCache.clear(); serverPublicCache = null; }
   const { currentTrack, isPlaying } = usePlayerStore.getState();
   updateDiscordPresence(currentTrack, isPlaying);
+  if (currentTrack?.albumId) prefetchAlbumImageUrl(currentTrack.albumId, currentTrack);
 }
 
-export function connectDiscordRPC() {
+export async function connectDiscordRPC() {
   if (!platformInstance?.connectDiscord) return;
   const enabled = getRpcSetting('dino_discord_rpc', false);
   if (!enabled) return;
   const clientId = getRpcSetting('dino_discord_rpc_client_id', '797506661857099858') as string;
-  platformInstance.connectDiscord(clientId).catch(() => {});
+  await platformInstance.connectDiscord(clientId);
 }
 
 export function clearDiscordRPC() {
@@ -287,7 +385,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     set({ isLoading: true, currentTrack: track, position: 0, duration: 0, buffered: 0 });
 
     updateDiscordPresence(track, true);
-    prefetchAlbumImageUrl(track.albumId);
+    prefetchAlbumImageUrl(track.albumId, track);
 
     scrobbleTrackId = track.id;
     scrobbleSubmitted = false;
@@ -508,6 +606,25 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
         } else {
           queueIndex = -1;
         }
+      }
+      return { queue, queueIndex };
+    });
+    saveQueueToServer();
+  },
+
+  moveInQueue: (fromIndex, toIndex) => {
+    set((state) => {
+      if (fromIndex === toIndex) return state;
+      const queue = [...state.queue];
+      const [moved] = queue.splice(fromIndex, 1);
+      queue.splice(toIndex, 0, moved);
+      let queueIndex = state.queueIndex;
+      if (fromIndex === queueIndex) {
+        queueIndex = toIndex;
+      } else if (fromIndex < queueIndex && toIndex >= queueIndex) {
+        queueIndex--;
+      } else if (fromIndex > queueIndex && toIndex <= queueIndex) {
+        queueIndex++;
       }
       return { queue, queueIndex };
     });

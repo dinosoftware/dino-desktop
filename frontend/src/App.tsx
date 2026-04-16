@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Disc3 } from 'lucide-react';
 import { HashRouter, Routes, Route } from 'react-router-dom';
 import { PlatformProvider, usePlatform } from '@/platform';
-import { useAuthStore, usePlayerStore, initializeAuthStore, initializePlayerStore, connectDiscordRPC, clearDiscordRPC } from '@/stores';
+import { useAuthStore, usePlayerStore, initializeAuthStore, initializePlayerStore, connectDiscordRPC, refreshDiscordPresence, clearDiscordRPC } from '@/stores';
 import { useTheme } from '@/hooks';
 import { AppLayout } from '@/components';
 import { LoginScreen, HomeScreen, LibraryScreen, SearchScreen, PlaylistsScreen, FavoritesScreen, SettingsScreen, AlbumScreen, ArtistScreen } from '@/screens';
@@ -18,7 +18,7 @@ function AppContent() {
   useEffect(() => {
     initializeAuthStore(platform);
     initializePlayerStore(platform);
-    connectDiscordRPC();
+    connectDiscordRPC().then(() => refreshDiscordPresence());
     loadServers().then(() => {
       setInitialized(true);
       loadQueueFromServer();
