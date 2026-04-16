@@ -43,19 +43,18 @@ function setupIpc() {
   ipcMain.handle('close-window', () => { if (mainWindow) mainWindow.close(); });
   ipcMain.handle('is-window-maximized', () => mainWindow ? mainWindow.isMaximized() : false);
 
-  ipcMain.handle('discord-connect', (_e, inputClientId) => {
+  ipcMain.handle('discord-connect', async (_e, inputClientId) => {
     const clientId = inputClientId || '797506661857099858';
     try {
       const { Client } = require('@xhayper/discord-rpc');
       if (discordRpc && discordClientId === clientId) return;
       if (discordRpc) { try { discordRpc.destroy(); } catch {} }
       const client = new Client({ clientId });
-      client.login().then(() => {
-        discordRpc = client;
-        discordClientId = clientId;
-        console.log('Discord RPC connected:', clientId);
-      }).catch((err) => { console.warn('Discord RPC login failed:', err.message); });
-    } catch (err) { console.warn('Discord RPC require failed:', err.message); }
+      await client.login();
+      discordRpc = client;
+      discordClientId = clientId;
+      console.log('Discord RPC connected:', clientId);
+    } catch (err) { console.warn('Discord RPC connect failed:', err.message); }
   });
 
   ipcMain.handle('discord-update-presence', (_e, args) => {
@@ -64,6 +63,7 @@ function setupIpc() {
       type: Number(args.activityType) || 2,
       details: String(args.details || ''),
       state: String(args.state || ''),
+      statusDisplayType: args.statusDisplayType != null ? Number(args.statusDisplayType) : 0,
     };
     if (args.largeImage) activity.largeImageKey = String(args.largeImage);
     if (args.largeText) activity.largeImageText = String(args.largeText);
@@ -96,6 +96,7 @@ function createWindow() {
     minWidth: 600,
     minHeight: 500,
     backgroundColor: '#1b1b1d',
+    icon: path.join(__dirname, 'frontend', 'dist', 'favicon.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
