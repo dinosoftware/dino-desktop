@@ -11,7 +11,7 @@ function AppContent() {
   const platform = usePlatform();
   const { isAuthenticated, loadServers } = useAuthStore();
   const { setPosition, setDuration, setIsPlaying, next, previous, handleTrackError, volume, loadQueueFromServer, setBuffered } = usePlayerStore();
-  const { setUpdateStatus, setUpdateInfo, setProgress, setError, setIsAppImage } = useUpdateStore();
+  const { setUpdateStatus, setUpdateInfo, setProgress, setError, setCanAutoUpdate } = useUpdateStore();
   const [initialized, setInitialized] = useState(false);
   
   useTheme();
@@ -60,7 +60,7 @@ function AppContent() {
   useEffect(() => {
     if (!platform.isDesktop || !platform.checkForUpdate) return;
 
-    if (platform.isAppImage) platform.isAppImage().then(setIsAppImage);
+    if (platform.canAutoUpdate) platform.canAutoUpdate().then(setCanAutoUpdate);
 
     const unsubProgress = platform.onUpdateDownloadProgress?.((p) => setProgress(p));
     const unsubDownloaded = platform.onUpdateDownloaded?.(() => setUpdateStatus('downloaded'));

@@ -32,7 +32,7 @@ declare global {
       updaterDownload(): Promise<void>;
       updaterInstall(): Promise<void>;
       updaterGetProgress(): Promise<DownloadProgress | null>;
-      updaterIsAppImage(): Promise<boolean>;
+      updaterCanAutoUpdate(): Promise<boolean>;
       getAppVersion(): Promise<string>;
       onUpdaterDownloadProgress(cb: (data: DownloadProgress) => void): () => void;
       onUpdaterDownloadComplete(cb: () => void): () => void;
@@ -355,8 +355,8 @@ export class ElectronPlatform implements PlatformAPI {
     return await window.electronAPI.updaterGetProgress();
   }
 
-  async isAppImage(): Promise<boolean> {
-    return await window.electronAPI.updaterIsAppImage();
+  async canAutoUpdate(): Promise<boolean> {
+    return await window.electronAPI.updaterCanAutoUpdate();
   }
 
   async getAppVersion(): Promise<string> {

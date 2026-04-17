@@ -8,13 +8,13 @@ interface UpdateState {
   updateInfo: UpdateInfo | null;
   progress: DownloadProgress | null;
   errorMessage: string | null;
-  isAppImage: boolean | null;
+  canAutoUpdate: boolean | null;
 
   setUpdateStatus: (status: UpdateStatus) => void;
   setUpdateInfo: (info: UpdateInfo | null) => void;
   setProgress: (progress: DownloadProgress | null) => void;
   setError: (msg: string | null) => void;
-  setIsAppImage: (val: boolean) => void;
+  setCanAutoUpdate: (val: boolean) => void;
   reset: () => void;
 }
 
@@ -23,12 +23,12 @@ export const useUpdateStore = create<UpdateState>((set) => ({
   updateInfo: null,
   progress: null,
   errorMessage: null,
-  isAppImage: null,
+  canAutoUpdate: null,
 
   setUpdateStatus: (status) => set({ status }),
   setUpdateInfo: (updateInfo) => set({ updateInfo }),
   setProgress: (progress) => set({ progress }),
   setError: (errorMessage) => set({ errorMessage }),
-  setIsAppImage: (isAppImage) => set({ isAppImage }),
+  setCanAutoUpdate: (canAutoUpdate) => set({ canAutoUpdate }),
   reset: () => set({ status: 'idle', updateInfo: null, progress: null, errorMessage: null }),
 }));

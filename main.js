@@ -143,7 +143,9 @@ function setupIpc() {
     return downloadProgress;
   });
 
-  ipcMain.handle('updater-is-appimage', () => {
+  ipcMain.handle('updater-can-auto-update', () => {
+    if (process.platform === 'win32') return true;
+    if (process.platform === 'darwin') return false;
     return Boolean(process.env.APPIMAGE);
   });
 

@@ -25,7 +25,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   updaterDownload: () => ipcRenderer.invoke('updater-download'),
   updaterInstall: () => ipcRenderer.invoke('updater-install'),
   updaterGetProgress: () => ipcRenderer.invoke('updater-get-progress'),
-  updaterIsAppImage: () => ipcRenderer.invoke('updater-is-appimage'),
+  updaterCanAutoUpdate: () => ipcRenderer.invoke('updater-can-auto-update'),
   getAppVersion: () => ipcRenderer.invoke('get-app-version'),
 
   onUpdaterDownloadProgress: (cb) => {

@@ -570,7 +570,7 @@ export function SettingsScreen() {
 
 function UpdateSection() {
   const platform = usePlatform();
-  const { status, updateInfo, progress, errorMessage, isAppImage, setUpdateStatus, setUpdateInfo, setError } = useUpdateStore();
+  const { status, updateInfo, progress, errorMessage, canAutoUpdate, setUpdateStatus, setUpdateInfo, setError } = useUpdateStore();
   const [appVersion, setAppVersion] = useState('');
 
   useEffect(() => {
@@ -642,9 +642,9 @@ function UpdateSection() {
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm font-medium">Current version: {appVersion || 'unknown'}</p>
-            {isAppImage !== null && (
+            {canAutoUpdate !== null && (
               <p className="text-xs text-muted-foreground">
-                {isAppImage ? 'AppImage (auto-update supported)' : 'Tarball install (manual update)'}
+                {canAutoUpdate ? 'Auto-update supported' : 'Manual update only — download from GitHub'}
               </p>
             )}
           </div>
@@ -664,7 +664,7 @@ function UpdateSection() {
           </div>
         )}
 
-        {status === 'idle' && !errorMessage && (
+        {status === 'idle' && !errorMessage && !updateInfo && (
           <div className="p-3 rounded-lg text-xs text-muted-foreground flex items-center gap-2">
             <Check className="h-4 w-4 text-green-500" />
             You&apos;re on the latest version
@@ -685,9 +685,10 @@ function UpdateSection() {
             </div>
 
             {releaseNotes && (
-              <div className="text-xs text-muted-foreground whitespace-pre-wrap max-h-32 overflow-y-auto bg-muted/50 rounded-md p-2">
-                {releaseNotes}
-              </div>
+              <div
+                className="text-xs text-muted-foreground max-h-32 overflow-y-auto bg-muted/50 rounded-md p-2 [&_a]:underline [&_a]:text-foreground"
+                dangerouslySetInnerHTML={{ __html: releaseNotes }}
+              />
             )}
 
             {status === 'downloading' && progress && (
@@ -734,7 +735,7 @@ function UpdateSection() {
 
             {status === 'available' && (
               <div className="flex gap-2">
-                {isAppImage ? (
+                {canAutoUpdate ? (
                   <button
                     onClick={handleDownload}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"

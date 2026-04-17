@@ -131,7 +131,7 @@ export interface PlatformAPI {
   downloadUpdate?(): Promise<void>;
   installUpdate?(): void;
   getUpdateProgress?(): Promise<DownloadProgress | null>;
-  isAppImage?(): Promise<boolean>;
+  canAutoUpdate?(): Promise<boolean>;
   getAppVersion?(): Promise<string>;
   onUpdateDownloadProgress?(callback: (progress: DownloadProgress) => void): () => void;
   onUpdateDownloaded?(callback: () => void): () => void;
