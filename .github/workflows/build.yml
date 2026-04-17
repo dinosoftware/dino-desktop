@@ -174,7 +174,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           VERSION="${{ needs.prepare.outputs.version }}"
-          gh release edit "$VERSION" --draft=false --generate-notes
+          NOTES=$(gh api "repos/{owner}/{repo}/releases/generate-notes" -f tag_name="$VERSION" --jq '.body')
+          gh release edit "$VERSION" --draft=false --notes "$NOTES"
 
   build-docker:
     if: inputs.build-docker
