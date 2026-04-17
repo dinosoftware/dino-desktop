@@ -20,4 +20,24 @@ contextBridge.exposeInMainWorld('electronAPI', {
   maximizeWindow: () => ipcRenderer.invoke('maximize-window'),
   closeWindow: () => ipcRenderer.invoke('close-window'),
   isWindowMaximized: () => ipcRenderer.invoke('is-window-maximized'),
+
+  updaterCheck: () => ipcRenderer.invoke('updater-check'),
+  updaterDownload: () => ipcRenderer.invoke('updater-download'),
+  updaterInstall: () => ipcRenderer.invoke('updater-install'),
+  updaterGetProgress: () => ipcRenderer.invoke('updater-get-progress'),
+  updaterIsAppImage: () => ipcRenderer.invoke('updater-is-appimage'),
+  getAppVersion: () => ipcRenderer.invoke('get-app-version'),
+
+  onUpdaterDownloadProgress: (cb) => {
+    ipcRenderer.on('updater-download-progress', (_e, data) => cb(data));
+    return () => ipcRenderer.removeAllListeners('updater-download-progress');
+  },
+  onUpdaterDownloadComplete: (cb) => {
+    ipcRenderer.on('updater-download-complete', () => cb());
+    return () => ipcRenderer.removeAllListeners('updater-download-complete');
+  },
+  onUpdaterError: (cb) => {
+    ipcRenderer.on('updater-error', (_e, msg) => cb(msg));
+    return () => ipcRenderer.removeAllListeners('updater-error');
+  },
 });

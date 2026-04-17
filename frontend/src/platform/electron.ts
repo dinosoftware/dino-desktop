@@ -1,4 +1,4 @@
-import type { PlatformAPI, ServerConfig, PlayQueue } from './types';
+import type { PlatformAPI, ServerConfig, PlayQueue, UpdateCheckResult, DownloadProgress } from './types';
 import type { Track } from '@/api/types';
 import { getArtistDisplay } from '@/lib/utils';
 
@@ -28,6 +28,15 @@ declare global {
       maximizeWindow(): Promise<void>;
       closeWindow(): Promise<void>;
       isWindowMaximized(): Promise<boolean>;
+      updaterCheck(): Promise<UpdateCheckResult>;
+      updaterDownload(): Promise<void>;
+      updaterInstall(): Promise<void>;
+      updaterGetProgress(): Promise<DownloadProgress | null>;
+      updaterIsAppImage(): Promise<boolean>;
+      getAppVersion(): Promise<string>;
+      onUpdaterDownloadProgress(cb: (data: DownloadProgress) => void): () => void;
+      onUpdaterDownloadComplete(cb: () => void): () => void;
+      onUpdaterError(cb: (msg: string) => void): () => void;
     };
   }
 }
@@ -328,6 +337,42 @@ export class ElectronPlatform implements PlatformAPI {
 
   async connectDiscord(clientId: string): Promise<void> {
     await window.electronAPI.discordConnect(clientId);
+  }
+
+  async checkForUpdate(): Promise<UpdateCheckResult> {
+    return await window.electronAPI.updaterCheck();
+  }
+
+  async downloadUpdate(): Promise<void> {
+    await window.electronAPI.updaterDownload();
+  }
+
+  installUpdate(): void {
+    window.electronAPI.updaterInstall();
+  }
+
+  async getUpdateProgress(): Promise<DownloadProgress | null> {
+    return await window.electronAPI.updaterGetProgress();
+  }
+
+  async isAppImage(): Promise<boolean> {
+    return await window.electronAPI.updaterIsAppImage();
+  }
+
+  async getAppVersion(): Promise<string> {
+    return await window.electronAPI.getAppVersion();
+  }
+
+  onUpdateDownloadProgress(callback: (progress: DownloadProgress) => void): () => void {
+    return window.electronAPI.onUpdaterDownloadProgress(callback);
+  }
+
+  onUpdateDownloaded(callback: () => void): () => void {
+    return window.electronAPI.onUpdaterDownloadComplete(callback);
+  }
+
+  onUpdateError(callback: (error: string) => void): () => void {
+    return window.electronAPI.onUpdaterError(callback);
   }
 
   getAudioElement(): HTMLAudioElement | null {

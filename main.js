@@ -1,8 +1,15 @@
-const { app, BrowserWindow, ipcMain, dialog, shell, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, Menu, Notification } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const { autoUpdater } = require('electron-updater');
 let discordRpc = null;
 let discordClientId = '';
+
+autoUpdater.autoDownload = false;
+autoUpdater.autoInstallOnAppQuit = true;
+
+let updateInfo = null;
+let downloadProgress = null;
 
 function configDir() {
   const dir = path.join(app.getPath('userData'), 'dino-desktop');
@@ -84,9 +91,93 @@ function setupIpc() {
       try { discordRpc.user?.clearActivity().catch(() => {}); } catch {}
     }
   });
+
+  ipcMain.handle('updater-check', async () => {
+    try {
+      const result = await autoUpdater.checkForUpdates();
+      if (result) {
+        updateInfo = {
+          version: result.updateInfo.version,
+          releaseDate: result.updateInfo.releaseDate,
+          releaseName: result.updateInfo.releaseName || result.updateInfo.version,
+          releaseNotes: result.updateInfo.releaseNotes,
+        };
+        return { available: true, info: updateInfo };
+      }
+      updateInfo = null;
+      return { available: false, info: null };
+    } catch (err) {
+      return { available: false, error: err.message };
+    }
+  });
+
+  ipcMain.handle('updater-download', () => {
+    return new Promise((resolve, reject) => {
+      if (!updateInfo) return reject(new Error('No update available'));
+      downloadProgress = { bytesPerSecond: 0, percent: 0, transferred: 0, total: 0 };
+      autoUpdater.downloadUpdate();
+      resolve();
+    });
+  });
+
+  ipcMain.handle('updater-install', () => {
+    autoUpdater.quitAndInstall(false, true);
+  });
+
+  ipcMain.handle('updater-get-progress', () => {
+    return downloadProgress;
+  });
+
+  ipcMain.handle('updater-is-appimage', () => {
+    return Boolean(process.env.APPIMAGE);
+  });
+
+  ipcMain.handle('get-app-version', () => {
+    return app.getVersion();
+  });
 }
 
+autoUpdater.on('download-progress', (info) => {
+  downloadProgress = {
+    bytesPerSecond: info.bytesPerSecond,
+    percent: info.percent,
+    transferred: info.transferred,
+    total: info.total,
+  };
+  if (mainWindow) {
+    mainWindow.webContents.send('updater-download-progress', downloadProgress);
+  }
+});
+
+autoUpdater.on('update-downloaded', () => {
+  downloadProgress = null;
+  if (mainWindow) {
+    mainWindow.webContents.send('updater-download-complete');
+  }
+});
+
+autoUpdater.on('error', (err) => {
+  console.warn('Auto-updater error:', err.message);
+  downloadProgress = null;
+  if (mainWindow) {
+    mainWindow.webContents.send('updater-error', err.message);
+  }
+});
+
 let mainWindow = null;
+
+const gotTheLock = app.requestSingleInstanceLock();
+
+if (!gotTheLock) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+    }
+  });
+}
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -117,6 +208,7 @@ function createWindow() {
 app.whenReady().then(() => {
   setupIpc();
   createWindow();
+  autoUpdater.checkForUpdates().catch(() => {});
   app.on('activate', () => { if (!mainWindow) createWindow(); });
 });
 

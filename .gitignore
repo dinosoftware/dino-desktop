@@ -1,6 +1,7 @@
 # Build output
 build/*
 !build/appicon.*
+!build/*.desktop
 frontend/dist/
 dist-electron/
 

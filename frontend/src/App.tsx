@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Disc3 } from 'lucide-react';
 import { HashRouter, Routes, Route } from 'react-router-dom';
 import { PlatformProvider, usePlatform } from '@/platform';
-import { useAuthStore, usePlayerStore, initializeAuthStore, initializePlayerStore, connectDiscordRPC, refreshDiscordPresence, clearDiscordRPC } from '@/stores';
+import { useAuthStore, usePlayerStore, useUpdateStore, initializeAuthStore, initializePlayerStore, connectDiscordRPC, refreshDiscordPresence, clearDiscordRPC } from '@/stores';
 import { useTheme } from '@/hooks';
 import { AppLayout } from '@/components';
 import { LoginScreen, HomeScreen, LibraryScreen, SearchScreen, PlaylistsScreen, FavoritesScreen, SettingsScreen, AlbumScreen, ArtistScreen } from '@/screens';
@@ -11,6 +11,7 @@ function AppContent() {
   const platform = usePlatform();
   const { isAuthenticated, loadServers } = useAuthStore();
   const { setPosition, setDuration, setIsPlaying, next, previous, handleTrackError, volume, loadQueueFromServer, setBuffered } = usePlayerStore();
+  const { setUpdateStatus, setUpdateInfo, setProgress, setError, setIsAppImage } = useUpdateStore();
   const [initialized, setInitialized] = useState(false);
   
   useTheme();
@@ -55,6 +56,32 @@ function AppContent() {
     window.addEventListener('beforeunload', cleanup);
     return () => window.removeEventListener('beforeunload', cleanup);
   }, []);
+
+  useEffect(() => {
+    if (!platform.isDesktop || !platform.checkForUpdate) return;
+
+    if (platform.isAppImage) platform.isAppImage().then(setIsAppImage);
+
+    const unsubProgress = platform.onUpdateDownloadProgress?.((p) => setProgress(p));
+    const unsubDownloaded = platform.onUpdateDownloaded?.(() => setUpdateStatus('downloaded'));
+    const unsubError = platform.onUpdateError?.(() => setError('Download failed'));
+
+    setUpdateStatus('checking');
+    platform.checkForUpdate().then((result) => {
+      if (result.available && result.info) {
+        setUpdateInfo(result.info);
+        setUpdateStatus('available');
+      } else {
+        setUpdateStatus('idle');
+      }
+    }).catch(() => setUpdateStatus('idle'));
+
+    return () => {
+      unsubProgress?.();
+      unsubDownloaded?.();
+      unsubError?.();
+    };
+  }, [platform]);
 
   if (!initialized) {
     return (

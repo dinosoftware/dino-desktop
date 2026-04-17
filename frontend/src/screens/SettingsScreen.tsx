@@ -1,9 +1,9 @@
-import { useAuthStore } from '@/stores';
+import { useAuthStore, useUpdateStore } from '@/stores';
 import { useTheme } from '@/hooks';
 import { usePlatform } from '@/platform';
-import { Sun, Moon, Monitor, LogOut, Server, Trash2, Wifi, Speaker, Palette, Info, Plus, Pencil, Check, X, Gamepad2 } from 'lucide-react';
+import { Sun, Moon, Monitor, LogOut, Server, Trash2, Wifi, Speaker, Palette, Info, Plus, Pencil, Check, X, Gamepad2, Download, RefreshCw, ArrowUpCircle, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { apiClient } from '@/api/client';
 import { refreshDiscordPresence, connectDiscordRPC, refreshWakeLock } from '@/stores/playerStore';
 
@@ -561,7 +561,208 @@ export function SettingsScreen() {
           <p>Connected to {apiClient.getServerUrl() || 'no server'}</p>
         </div>
       </section>
+
+      {/* UPDATES — desktop only */}
+      {platform.isDesktop && <UpdateSection />}
     </div>
+  );
+}
+
+function UpdateSection() {
+  const platform = usePlatform();
+  const { status, updateInfo, progress, errorMessage, isAppImage, setUpdateStatus, setUpdateInfo, setError } = useUpdateStore();
+  const [appVersion, setAppVersion] = useState('');
+
+  useEffect(() => {
+    if (platform.getAppVersion) {
+      platform.getAppVersion().then(setAppVersion);
+    }
+  }, [platform]);
+
+  const handleCheck = useCallback(async () => {
+    if (!platform.checkForUpdate) return;
+    setUpdateStatus('checking');
+    setError(null);
+    setUpdateInfo(null);
+    try {
+      const result = await platform.checkForUpdate();
+      if (result.available && result.info) {
+        setUpdateInfo(result.info);
+        setUpdateStatus('available');
+      } else {
+        setUpdateStatus('idle');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Check failed');
+    }
+  }, [platform, setUpdateStatus, setError, setUpdateInfo]);
+
+  const handleDownload = useCallback(async () => {
+    if (!platform.downloadUpdate) return;
+    setUpdateStatus('downloading');
+    setError(null);
+    try {
+      await platform.downloadUpdate();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Download failed');
+    }
+  }, [platform, setUpdateStatus, setError]);
+
+  const handleInstall = useCallback(() => {
+    if (platform.installUpdate) platform.installUpdate();
+  }, [platform]);
+
+  const formatBytes = (bytes: number) => {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
+  };
+
+  const formatSpeed = (bytesPerSecond: number) => {
+    return `${formatBytes(bytesPerSecond)}/s`;
+  };
+
+  const releaseNotes = (() => {
+    if (!updateInfo?.releaseNotes) return null;
+    const notes = updateInfo.releaseNotes;
+    if (typeof notes === 'string') return notes;
+    if (Array.isArray(notes)) return notes.map((n: { version?: string; note: string }) => n.note).join('\n');
+    return null;
+  })();
+
+  return (
+    <section className="space-y-3">
+      <div className="flex items-center gap-2">
+        <ArrowUpCircle className="h-5 w-5 text-muted-foreground" />
+        <h2 className="text-lg font-semibold">Updates</h2>
+      </div>
+      <div className="space-y-3 p-4 rounded-xl border bg-card">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium">Current version: {appVersion || 'unknown'}</p>
+            {isAppImage !== null && (
+              <p className="text-xs text-muted-foreground">
+                {isAppImage ? 'AppImage (auto-update supported)' : 'Tarball install (manual update)'}
+              </p>
+            )}
+          </div>
+          <button
+            onClick={handleCheck}
+            disabled={status === 'checking' || status === 'downloading'}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors hover:bg-accent disabled:opacity-50"
+          >
+            <RefreshCw className={cn('h-3.5 w-3.5', status === 'checking' && 'animate-spin')} />
+            {status === 'checking' ? 'Checking...' : 'Check for Updates'}
+          </button>
+        </div>
+
+        {errorMessage && (
+          <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-xs">
+            {errorMessage}
+          </div>
+        )}
+
+        {status === 'idle' && !errorMessage && (
+          <div className="p-3 rounded-lg text-xs text-muted-foreground flex items-center gap-2">
+            <Check className="h-4 w-4 text-green-500" />
+            You&apos;re on the latest version
+          </div>
+        )}
+
+        {(status === 'available' || status === 'downloading' || status === 'downloaded') && updateInfo && (
+          <div className="space-y-3 p-3 rounded-lg border">
+            <div>
+              <p className="text-sm font-medium text-foreground">
+                Update available: v{updateInfo.version}
+              </p>
+              {updateInfo.releaseDate && (
+                <p className="text-xs text-muted-foreground">
+                  Released {new Date(updateInfo.releaseDate).toLocaleDateString()}
+                </p>
+              )}
+            </div>
+
+            {releaseNotes && (
+              <div className="text-xs text-muted-foreground whitespace-pre-wrap max-h-32 overflow-y-auto bg-muted/50 rounded-md p-2">
+                {releaseNotes}
+              </div>
+            )}
+
+            {status === 'downloading' && progress && (
+              <div className="space-y-1.5">
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>{Math.round(progress.percent)}%</span>
+                  <span>{formatSpeed(progress.bytesPerSecond)}</span>
+                </div>
+                <div className="w-full h-1.5 rounded-full bg-muted overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all"
+                    style={{
+                      width: `${progress.percent}%`,
+                      backgroundColor: 'var(--toggle-on)',
+                    }}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {formatBytes(progress.transferred)} / {formatBytes(progress.total)}
+                </p>
+              </div>
+            )}
+
+            {status === 'downloading' && !progress && (
+              <p className="text-xs text-muted-foreground">Starting download...</p>
+            )}
+
+            {status === 'downloaded' && (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-xs text-green-500">
+                  <Download className="h-4 w-4" />
+                  Download complete
+                </div>
+                <button
+                  onClick={handleInstall}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
+                  style={{ backgroundColor: 'var(--toggle-on)', color: 'var(--toggle-on-knob)' }}
+                >
+                  <RefreshCw className="h-3.5 w-3.5" />
+                  Restart & Install Update
+                </button>
+              </div>
+            )}
+
+            {status === 'available' && (
+              <div className="flex gap-2">
+                {isAppImage ? (
+                  <button
+                    onClick={handleDownload}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
+                    style={{ backgroundColor: 'var(--toggle-on)', color: 'var(--toggle-on-knob)' }}
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    Download Update
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => {
+                      if (platform.openExternal) {
+                        platform.openExternal('https://github.com/dinosoftware/dino-desktop/releases/latest');
+                      }
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
+                    style={{ backgroundColor: 'var(--toggle-on)', color: 'var(--toggle-on-knob)' }}
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" />
+                    Download from GitHub
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </section>
   );
 }
 

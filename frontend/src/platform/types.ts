@@ -1,5 +1,25 @@
 import type { Track } from '@/api/types';
 
+export interface UpdateInfo {
+  version: string;
+  releaseDate: string;
+  releaseName: string;
+  releaseNotes: string | Array<{ version: string; note: string }>;
+}
+
+export interface UpdateCheckResult {
+  available: boolean;
+  info: UpdateInfo | null;
+  error?: string;
+}
+
+export interface DownloadProgress {
+  bytesPerSecond: number;
+  percent: number;
+  transferred: number;
+  total: number;
+}
+
 export interface PlayQueue {
   current?: string;
   position?: number;
@@ -105,4 +125,15 @@ export interface PlatformAPI {
   maximizeWindow?(): void;
   closeWindow?(): void;
   isWindowMaximized?(): Promise<boolean>;
+
+  // Auto-updater (desktop only)
+  checkForUpdate?(): Promise<UpdateCheckResult>;
+  downloadUpdate?(): Promise<void>;
+  installUpdate?(): void;
+  getUpdateProgress?(): Promise<DownloadProgress | null>;
+  isAppImage?(): Promise<boolean>;
+  getAppVersion?(): Promise<string>;
+  onUpdateDownloadProgress?(callback: (progress: DownloadProgress) => void): () => void;
+  onUpdateDownloaded?(callback: () => void): () => void;
+  onUpdateError?(callback: (error: string) => void): () => void;
 }

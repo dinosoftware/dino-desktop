@@ -1,6 +1,6 @@
 {
   "name": "dino-desktop",
-  "version": "1.6.0",
+  "version": "1.6.1",
   "description": "A modern OpenSubsonic music player",
   "author": "Dino Desktop",
   "private": true,
@@ -8,7 +8,10 @@
   "scripts": {
     "dev": "node dev.js",
     "build": "cd frontend && npm run build && cd .. && electron-builder",
-    "build:dir": "cd frontend && npm run build && cd .. && electron-builder --dir"
+    "build:dir": "cd frontend && npm run build && cd .. && electron-builder --dir",
+    "build:linux": "cd frontend && npm run build && cd .. && electron-builder --linux",
+    "build:linux:x64": "cd frontend && npm run build && cd .. && electron-builder --linux --x64",
+    "build:linux:arm64": "cd frontend && npm run build && cd .. && electron-builder --linux --arm64"
   },
   "devDependencies": {
     "electron": "^36.2.0",
@@ -26,10 +29,27 @@
     "directories": {
       "output": "dist-electron"
     },
+    "publish": {
+      "provider": "github",
+      "owner": "dinosoftware",
+      "repo": "dino-desktop"
+    },
     "linux": {
       "target": [
-        "AppImage",
-        "tar.gz"
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        },
+        {
+          "target": "tar.gz",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
       ],
       "category": "Audio",
       "icon": "build/appicon.png",
@@ -43,6 +63,10 @@
           "to": "dino-desktop.png"
         }
       ]
+    },
+    "artifactName": "dino-desktop-${version}-linux-${arch}.${ext}",
+    "appImage": {
+      "artifactName": "dino-desktop-${version}-${arch}.AppImage"
     },
     "win": {
       "target": "nsis",
@@ -59,6 +83,7 @@
     }
   },
   "dependencies": {
-    "@xhayper/discord-rpc": "^1.3.3"
+    "@xhayper/discord-rpc": "^1.3.3",
+    "electron-updater": "^6.8.3"
   }
 }

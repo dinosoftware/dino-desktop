@@ -1,0 +1,12 @@
+[Desktop Entry]
+Name=Dino Desktop
+Comment=A modern OpenSubsonic music player
+Exec=dino-desktop
+Icon=dino-desktop
+Type=Application
+Categories=Audio;Music;Player;AudioVideo;
+Keywords=music;player;subsonic;opensubsonic;streaming;
+StartupWMClass=Dino Desktop
+StartupNotify=true
+MimeType=x-scheme-handler/dino;
+

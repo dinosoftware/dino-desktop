@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { usePlayerStore } from '@/stores';
+import { usePlayerStore, useUpdateStore } from '@/stores';
 import { cn, formatTime, getArtistDisplay } from '@/lib/utils';
 import {
   Home,
@@ -226,6 +226,7 @@ export function AppLayout({ children }: AppLayoutProps) {
     loadQueueFromServer,
     buffered,
   } = usePlayerStore();
+  const updateStatus = useUpdateStore((s) => s.status);
 
   const qualityBadge = useQualityBadge(currentTrack);
 
@@ -580,8 +581,22 @@ export function AppLayout({ children }: AppLayoutProps) {
             onMouseEnter={(e) => { if (location.pathname !== '/settings') { e.currentTarget.style.color = 'hsl(var(--foreground))'; e.currentTarget.style.backgroundColor = 'hsl(var(--accent))'; e.currentTarget.style.transform = 'scale(0.98)'; } }}
             onMouseLeave={(e) => { if (location.pathname !== '/settings') { e.currentTarget.style.color = 'hsl(var(--muted-foreground))'; e.currentTarget.style.backgroundColor = ''; e.currentTarget.style.transform = ''; } }}
           >
-            <Settings className="h-5 w-5 flex-shrink-0" />
-            {!sidebarCollapsed && 'Settings'}
+            <div className="relative">
+              <Settings className="h-5 w-5 flex-shrink-0" />
+              {platform.isDesktop && (updateStatus === 'available' || updateStatus === 'downloaded') && (
+                <div className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full" style={{ backgroundColor: 'var(--toggle-on)' }} />
+              )}
+            </div>
+            {!sidebarCollapsed && (
+              <span className="flex items-center gap-2">
+                Settings
+                {platform.isDesktop && (updateStatus === 'available' || updateStatus === 'downloaded') && (
+                  <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full" style={{ backgroundColor: 'var(--toggle-on)', color: 'var(--toggle-on-knob)' }}>
+                    {updateStatus === 'downloaded' ? 'Ready' : 'Update'}
+                  </span>
+                )}
+              </span>
+            )}
           </button>
         </div>
 
