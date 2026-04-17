@@ -627,7 +627,10 @@ function UpdateSection() {
   const releaseNotes = (() => {
     if (!updateInfo?.releaseNotes) return null;
     const notes = updateInfo.releaseNotes;
-    if (typeof notes === 'string') return notes;
+    if (typeof notes === 'string') {
+      const cleaned = notes.replace(/<p>\s*<strong>Full Changelog<\/strong>.*?<\/p>/gi, '').trim();
+      return cleaned || null;
+    }
     if (Array.isArray(notes)) return notes.map((n: { version?: string; note: string }) => n.note).join('\n');
     return null;
   })();
