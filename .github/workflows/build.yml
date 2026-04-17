@@ -30,17 +30,15 @@ jobs:
       version: ${{ steps.tag.outputs.version }}
     steps:
       - uses: actions/checkout@v4
-      - name: Create tag
+      - name: Create tag and draft release
         id: tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           VERSION="${{ inputs.version }}"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           git tag -f "$VERSION"
           git push origin "$VERSION"
-      - name: Create draft release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
           gh release create "$VERSION" --title "$VERSION" --draft --notes "Release $VERSION"
 
   build-linux:
