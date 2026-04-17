@@ -64,7 +64,10 @@ function AppContent() {
 
     const unsubProgress = platform.onUpdateDownloadProgress?.((p) => setProgress(p));
     const unsubDownloaded = platform.onUpdateDownloaded?.(() => setUpdateStatus('downloaded'));
-    const unsubError = platform.onUpdateError?.(() => setError('Download failed'));
+    const unsubError = platform.onUpdateError?.((msg) => {
+      setError(msg);
+      setUpdateStatus('error');
+    });
 
     setUpdateStatus('checking');
     platform.checkForUpdate().then((result) => {

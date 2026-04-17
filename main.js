@@ -96,6 +96,21 @@ function setupIpc() {
     try {
       const result = await autoUpdater.checkForUpdates();
       if (result) {
+        const current = app.getVersion().replace(/^v/, '');
+        const remote = (result.updateInfo.version || '').replace(/^v/, '');
+        const partsA = current.split('.').map(Number);
+        const partsB = remote.split('.').map(Number);
+        let isNewer = false;
+        for (let i = 0; i < Math.max(partsA.length, partsB.length); i++) {
+          const a = partsA[i] || 0;
+          const b = partsB[i] || 0;
+          if (b > a) { isNewer = true; break; }
+          if (b < a) { break; }
+        }
+        if (!isNewer) {
+          updateInfo = null;
+          return { available: false, info: null };
+        }
         updateInfo = {
           version: result.updateInfo.version,
           releaseDate: result.updateInfo.releaseDate,

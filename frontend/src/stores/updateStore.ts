@@ -28,7 +28,7 @@ export const useUpdateStore = create<UpdateState>((set) => ({
   setUpdateStatus: (status) => set({ status }),
   setUpdateInfo: (updateInfo) => set({ updateInfo }),
   setProgress: (progress) => set({ progress }),
-  setError: (errorMessage) => set({ errorMessage, status: errorMessage ? 'error' : 'idle' }),
+  setError: (errorMessage) => set({ errorMessage }),
   setIsAppImage: (isAppImage) => set({ isAppImage }),
   reset: () => set({ status: 'idle', updateInfo: null, progress: null, errorMessage: null }),
 }));
