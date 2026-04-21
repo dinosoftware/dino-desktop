@@ -23,6 +23,7 @@ import {
   Mic2,
   Trash2,
   Disc,
+  Disc3,
   User,
   X,
   ListPlus,
@@ -225,6 +226,8 @@ export function AppLayout({ children }: AppLayoutProps) {
     removeFromQueue,
     loadQueueFromServer,
     buffered,
+    isLoading,
+    isBuffering,
   } = usePlayerStore();
   const updateStatus = useUpdateStore((s) => s.status);
 
@@ -723,7 +726,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                   className="h-12 w-12 sm:h-14 sm:w-14 xl:h-16 xl:w-16 rounded-full flex items-center justify-center transition-all duration-200 active:scale-95"
                   style={{ backgroundColor: 'var(--toggle-on)', color: 'var(--toggle-on-knob)', boxShadow: '0 4px 14px rgba(0,0,0,0.3)' }}
                 >
-                  {isPlaying ? <Pause className="h-5 w-5 sm:h-6 sm:w-6" /> : <Play className="h-5 w-5 sm:h-6 sm:w-6 ml-0.5" />}
+                  {(isLoading || isBuffering) ? <Disc3 className="h-5 w-5 sm:h-6 sm:w-6 animate-spin" style={{ animationDuration: '1s' }} /> : isPlaying ? <Pause className="h-5 w-5 sm:h-6 sm:w-6" /> : <Play className="h-5 w-5 sm:h-6 sm:w-6 ml-0.5" />}
                 </button>
                 <ControlButton onClick={next} icon={<SkipForward className="h-5 w-5 sm:h-6 sm:w-6" />} size="lg" />
                 <ControlButton
@@ -756,14 +759,16 @@ export function AppLayout({ children }: AppLayoutProps) {
                     fillColor="var(--slider-fill)"
                     thumbColor="var(--slider-fill-strong)"
                     step={0.01}
-                    onWheel={(e) => { e.preventDefault(); setVolume(Math.max(0, Math.min(1, volume + (e.deltaY < 0 ? 0.05 : -0.05)))); }}
+                    onWheel={(e) => setVolume(Math.max(0, Math.min(1, volume + (e.deltaY < 0 ? 0.05 : -0.05))))}
                   />
                 </div>
               </div>
 
-              <div className="mt-4 flex justify-center">
-                <AudioVisualizer analyser={analyser} isPlaying={isPlaying} barCount={40} barWidth={3} barGap={2} maxHeight={28} mirror opacity={0.5} />
-              </div>
+              {!platform.isMpvEnabled?.() && (
+                <div className="mt-4 flex justify-center">
+                  <AudioVisualizer analyser={analyser} isPlaying={isPlaying} barCount={40} barWidth={3} barGap={2} maxHeight={28} mirror opacity={0.5} />
+                </div>
+              )}
             </div>
 
             <div className="flex-1 lg:w-1/2 flex flex-col lg:pl-6 pt-2 lg:pt-0 min-h-0">
@@ -938,7 +943,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                   fillColor="var(--slider-fill)"
                   thumbColor="var(--slider-fill-strong)"
                   step={0.01}
-                  onWheel={(e) => { e.preventDefault(); setVolume(Math.max(0, Math.min(1, volume + (e.deltaY < 0 ? 0.05 : -0.05)))); }}
+                  onWheel={(e) => setVolume(Math.max(0, Math.min(1, volume + (e.deltaY < 0 ? 0.05 : -0.05))))}
                 />
               </div>
               <button onClick={() => setShowQueue(!showQueue)} className="p-1.5 rounded-full transition-colors" style={{ color: showQueue ? 'hsl(var(--primary))' : 'hsl(var(--muted-foreground))' }}>
@@ -1165,7 +1170,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                     className="h-12 w-12 sm:h-14 sm:w-14 xl:h-16 xl:w-16 rounded-full flex items-center justify-center transition-all duration-200 active:scale-95"
                     style={{ backgroundColor: 'var(--toggle-on)', color: 'var(--toggle-on-knob)', boxShadow: '0 4px 14px rgba(0,0,0,0.3)' }}
                   >
-                    {isPlaying ? <Pause className="h-5 w-5 sm:h-6 sm:w-6" /> : <Play className="h-5 w-5 sm:h-6 sm:w-6 ml-0.5" />}
+                    {(isLoading || isBuffering) ? <Disc3 className="h-5 w-5 sm:h-6 sm:w-6 animate-spin" style={{ animationDuration: '1s' }} /> : isPlaying ? <Pause className="h-5 w-5 sm:h-6 sm:w-6" /> : <Play className="h-5 w-5 sm:h-6 sm:w-6 ml-0.5" />}
                   </button>
                   <ControlButton onClick={next} icon={<SkipForward className="h-5 w-5 sm:h-6 sm:w-6" />} size="lg" />
                   <ControlButton
@@ -1198,15 +1203,17 @@ export function AppLayout({ children }: AppLayoutProps) {
                       fillColor="var(--slider-fill)"
                       thumbColor="var(--slider-fill-strong)"
                       step={0.01}
-                      onWheel={(e) => { e.preventDefault(); setVolume(Math.max(0, Math.min(1, volume + (e.deltaY < 0 ? 0.05 : -0.05)))); }}
+                      onWheel={(e) => setVolume(Math.max(0, Math.min(1, volume + (e.deltaY < 0 ? 0.05 : -0.05))))}
                     />
                   </div>
                 </div>
-               </div>
+                </div>
 
-                <div className="mt-4 flex justify-center">
-                  <AudioVisualizer analyser={analyser} isPlaying={isPlaying} barCount={48} barWidth={3} barGap={2} maxHeight={32} mirror opacity={0.45} />
-               </div>
+                {!platform.isMpvEnabled?.() && (
+                  <div className="mt-4 flex justify-center">
+                    <AudioVisualizer analyser={analyser} isPlaying={isPlaying} barCount={48} barWidth={3} barGap={2} maxHeight={32} mirror opacity={0.45} />
+                  </div>
+                )}
              </div>
 
              <div className="flex-1 lg:w-1/2 flex flex-col lg:pl-6 pt-2 lg:pt-0 min-h-0">

@@ -15,6 +15,7 @@ interface PlayerState {
   repeat: 'off' | 'all' | 'one';
   shuffle: boolean;
   isLoading: boolean;
+  isBuffering: boolean;
   originalQueue: Track[];
   buffered: number;
 
@@ -40,6 +41,7 @@ interface PlayerState {
   handleTrackError: (error: string) => void;
   loadQueueFromServer: () => Promise<void>;
   setBuffered: (buffered: number) => void;
+  setBuffering: (isBuffering: boolean) => void;
 }
 
 let platformInstance: ReturnType<typeof usePlatform> | null = null;
@@ -60,6 +62,7 @@ const MAX_RETRIES = 3;
 let scrobbleTrackId: string | null = null;
 let scrobbleSubmitted = false;
 let wakeLockRef: WakeLockSentinel | null = null;
+let mpvLastPreloadedIndex = -1;
 
 async function requestWakeLock() {
   if (!('wakeLock' in navigator)) return;
@@ -124,6 +127,29 @@ function submitScrobble() {
   if (!enabled) return;
   scrobbleSubmitted = true;
   apiClient.scrobble(scrobbleTrackId, true).catch(() => {});
+}
+
+function preloadNext() {
+  const platform = getPlatform();
+  if (platform.isMpvEnabled?.()) {
+    const { queue, queueIndex } = usePlayerStore.getState();
+    const nextIdx = queueIndex + 1;
+    if (nextIdx < queue.length && nextIdx !== mpvLastPreloadedIndex) {
+      mpvLastPreloadedIndex = nextIdx;
+      const url = apiClient.buildStreamUrl(queue[nextIdx].id);
+      platform.preload?.(url);
+    }
+    return;
+  }
+  const gapless = getRpcSetting('dino_gapless', true) as boolean;
+  if (!gapless) return;
+  if (!platform.preload) return;
+  const { queue, queueIndex } = usePlayerStore.getState();
+  const nextIdx = queueIndex + 1;
+  if (nextIdx < queue.length) {
+    const url = apiClient.buildStreamUrl(queue[nextIdx].id);
+    platform.preload(url);
+  }
 }
 
 async function autoExtendQueue() {
@@ -376,12 +402,15 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   repeat: loadPersistedState().repeat,
   shuffle: loadPersistedState().shuffle,
   isLoading: false,
+  isBuffering: false,
   originalQueue: [],
   buffered: 0,
 
   play: async (track) => {
+    console.trace('[play] called for:', track.title, 'id:', track.id);
     const platform = getPlatform();
     retryCount = 0;
+    mpvLastPreloadedIndex = -1;
     set({ isLoading: true, currentTrack: track, position: 0, duration: 0, buffered: 0 });
 
     updateDiscordPresence(track, true);
@@ -400,7 +429,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
         apiClient.scrobble(track.id, false).catch(() => {});
       }
 
-      const { queue, queueIndex } = get();
+       const { queue, queueIndex } = get();
       if (queueIndex === -1 || queue[queueIndex]?.id !== track.id) {
         const idx = queue.findIndex(t => t.id === track.id);
         if (idx >= 0) {
@@ -408,7 +437,8 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
         }
       }
 
-       autoExtendQueue();
+      preloadNext();
+      autoExtendQueue();
       saveQueueToServer();
     } catch (e) {
       console.warn('play error:', e);
@@ -443,17 +473,22 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
 
   resume: async () => {
     const platform = getPlatform();
-    const { currentTrack, position } = get();
+    const { currentTrack } = get();
     if (!currentTrack) return;
 
     try {
-      const audio = platform.getAudioElement();
-      if (audio && audio.src && audio.readyState >= 2) {
+      if (platform.isMpvEnabled?.()) {
         await platform.resume();
       } else {
-        const url = apiClient.buildStreamUrl(currentTrack.id);
-        await platform.play(currentTrack, url);
-        if (position > 0) await platform.seek(position);
+        const audio = platform.getAudioElement();
+        if (audio && audio.src && audio.readyState >= 2) {
+          await platform.resume();
+        } else {
+          const url = apiClient.buildStreamUrl(currentTrack.id);
+          await platform.play(currentTrack, url);
+          const { position } = get();
+          if (position > 0) await platform.seek(position);
+        }
       }
     } catch {
       return;
@@ -470,7 +505,9 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   },
 
   next: () => {
+    console.trace('[next] called');
     const { queue, queueIndex, repeat, currentTrack } = get();
+    console.log('[next] queueIndex:', queueIndex, 'queue.length:', queue.length, 'currentTrack:', currentTrack?.title);
 
     submitScrobble();
 
@@ -493,8 +530,27 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
 
     const track = queue[nextIndex];
     if (track) {
+      const wasMpvAutoAdvanced = !!(platformInstance?.isMpvEnabled?.() && platformInstance.consumeMpvAutoAdvanced?.());
+      console.log('[next] advancing to index:', nextIndex, 'track:', track.title, 'mpvAuto:', wasMpvAutoAdvanced);
       set({ queueIndex: nextIndex });
-      get().play(track);
+      if (wasMpvAutoAdvanced) {
+        console.log('[next] mpv auto-advanced, updating metadata for:', track.title);
+        set({ currentTrack: track, position: 0, duration: 0, buffered: 0 });
+        updateDiscordPresence(track, true);
+        prefetchAlbumImageUrl(track.albumId, track);
+        scrobbleTrackId = track.id;
+        scrobbleSubmitted = false;
+        const coverUrl = track.coverArt ? apiClient.buildCoverArtUrl(track.coverArt, 512) : undefined;
+        platformInstance?.setMediaMetadata(track, coverUrl).catch(() => {});
+        if (getRpcSetting('dino_scrobble', true)) {
+          apiClient.scrobble(track.id, false).catch(() => {});
+        }
+        preloadNext();
+        autoExtendQueue();
+        saveQueueToServer();
+      } else {
+        get().play(track);
+      }
     }
   },
 
@@ -527,9 +583,9 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
 
   setVolume: async (volume) => {
     const platform = getPlatform();
-    await platform.setVolume(volume);
     set({ volume });
     persistVolume(volume);
+    platform.setVolume(volume).catch(() => {});
   },
 
   toggleRepeat: () => {
@@ -691,6 +747,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
         });
 
         if (currentTrack) {
+          set({ isLoading: true });
           const platform = getPlatform();
           const url = apiClient.buildStreamUrl(currentTrack.id);
           const coverUrl = currentTrack.coverArt ? apiClient.buildCoverArtUrl(currentTrack.coverArt, 512) : undefined;
@@ -698,9 +755,9 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
             await platform.play(currentTrack, url);
             await platform.seek(posSeconds);
             await platform.pause();
-            set({ isPlaying: false });
+            set({ isPlaying: false, isLoading: false });
           } catch {
-            set({ isPlaying: false });
+            set({ isPlaying: false, isLoading: false });
           }
           platform.setMediaMetadata(currentTrack, coverUrl).catch(() => {});
         }
@@ -711,6 +768,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   },
 
   setBuffered: (buffered) => set({ buffered }),
+  setBuffering: (isBuffering) => set({ isBuffering }),
 }));
 
 function shuffleArray<T>(array: T[]): T[] {

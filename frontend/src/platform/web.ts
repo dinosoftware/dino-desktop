@@ -9,46 +9,69 @@ const QUEUE_KEY = 'dino_queue';
 export class WebPlatform implements PlatformAPI {
   isDesktop = false;
   private audio: HTMLAudioElement;
+  private preloadAudio: HTMLAudioElement | null = null;
+  private preloadUrl: string | null = null;
   private audioCtx: AudioContext | null = null;
   private analyserNode: AnalyserNode | null = null;
+  private gainNode: GainNode | null = null;
+  private currentSource: MediaElementAudioSourceNode | null = null;
   private positionCallbacks: Set<(pos: number) => void> = new Set();
   private durationCallbacks: Set<(dur: number) => void> = new Set();
   private trackEndCallbacks: Set<() => void> = new Set();
   private trackErrorCallbacks: Set<(error: string) => void> = new Set();
   private playStateCallbacks: Set<(playing: boolean) => void> = new Set();
   private bufferCallbacks: Set<(buffered: number) => void> = new Set();
+  private bufferingCallbacks: Set<(isBuffering: boolean) => void> = new Set();
   private nextCallbacks: Set<() => void> = new Set();
   private prevCallbacks: Set<() => void> = new Set();
   private pendingPlay: Promise<void> = Promise.resolve();
+  private boundTimeupdate: () => void;
+  private boundDurationchange: () => void;
+  private boundEnded: () => void;
+  private boundError: () => void;
+  private boundPlay: () => void;
+  private boundPause: () => void;
+  private boundProgress: () => void;
+  private boundWaiting: () => void;
+  private boundPlaying: () => void;
 
   constructor() {
     this.audio = new Audio();
     this.audio.crossOrigin = 'anonymous';
-    this.audio.addEventListener('timeupdate', () => {
+
+    this.boundTimeupdate = () => {
       this.positionCallbacks.forEach(cb => cb(this.audio.currentTime));
-    });
-    this.audio.addEventListener('durationchange', () => {
+    };
+    this.boundDurationchange = () => {
       this.durationCallbacks.forEach(cb => cb(this.audio.duration));
-    });
-    this.audio.addEventListener('ended', () => {
+    };
+    this.boundEnded = () => {
       this.trackEndCallbacks.forEach(cb => cb());
-    });
-    this.audio.addEventListener('error', () => {
+    };
+    this.boundError = () => {
       const err = this.audio.error?.message || 'playback error';
       this.trackErrorCallbacks.forEach(cb => cb(err));
-    });
-    this.audio.addEventListener('play', () => {
+    };
+    this.boundPlay = () => {
       this.playStateCallbacks.forEach(cb => cb(true));
-    });
-    this.audio.addEventListener('pause', () => {
+    };
+    this.boundPause = () => {
       if (this.audio.ended) return;
       this.playStateCallbacks.forEach(cb => cb(false));
-    });
-    this.audio.addEventListener('progress', () => {
+    };
+    this.boundProgress = () => {
       if (this.audio.buffered.length > 0) {
         this.bufferCallbacks.forEach(cb => cb(this.audio.buffered.end(this.audio.buffered.length - 1)));
       }
-    });
+    };
+    this.boundWaiting = () => {
+      this.bufferingCallbacks.forEach(cb => cb(true));
+    };
+    this.boundPlaying = () => {
+      this.bufferingCallbacks.forEach(cb => cb(false));
+    };
+
+    this.attachAudioEvents(this.audio);
 
     if ('mediaSession' in navigator) {
       navigator.mediaSession.setActionHandler('play', () => {
@@ -66,26 +89,39 @@ export class WebPlatform implements PlatformAPI {
     }
   }
 
-  async getServers(): Promise<ServerConfig[]> {
-    const data = localStorage.getItem(SERVERS_KEY);
-    return data ? JSON.parse(data) : [];
+  private attachAudioEvents(el: HTMLAudioElement) {
+    el.addEventListener('timeupdate', this.boundTimeupdate);
+    el.addEventListener('durationchange', this.boundDurationchange);
+    el.addEventListener('ended', this.boundEnded);
+    el.addEventListener('error', this.boundError);
+    el.addEventListener('play', this.boundPlay);
+    el.addEventListener('pause', this.boundPause);
+    el.addEventListener('progress', this.boundProgress);
+    el.addEventListener('waiting', this.boundWaiting);
+    el.addEventListener('playing', this.boundPlaying);
   }
 
-  async saveServers(servers: ServerConfig[]): Promise<void> {
-    localStorage.setItem(SERVERS_KEY, JSON.stringify(servers));
-  }
-
-  async getLastServerId(): Promise<string | null> {
-    return localStorage.getItem(LAST_SERVER_KEY);
-  }
-
-  async setLastServerId(id: string): Promise<void> {
-    localStorage.setItem(LAST_SERVER_KEY, id);
+  private detachAudioEvents(el: HTMLAudioElement) {
+    el.removeEventListener('timeupdate', this.boundTimeupdate);
+    el.removeEventListener('durationchange', this.boundDurationchange);
+    el.removeEventListener('ended', this.boundEnded);
+    el.removeEventListener('error', this.boundError);
+    el.removeEventListener('play', this.boundPlay);
+    el.removeEventListener('pause', this.boundPause);
+    el.removeEventListener('progress', this.boundProgress);
+    el.removeEventListener('waiting', this.boundWaiting);
+    el.removeEventListener('playing', this.boundPlaying);
   }
 
   private async initAudioPipeline() {
     if (this.audioCtx) {
       if (this.audioCtx.state === 'suspended') await this.audioCtx.resume();
+      if (this.currentSource && this.currentSource.mediaElement !== this.audio) {
+        this.currentSource.disconnect();
+        const source = this.audioCtx.createMediaElementSource(this.audio);
+        source.connect(this.gainNode!);
+        this.currentSource = source;
+      }
       return;
     }
     try {
@@ -103,12 +139,38 @@ export class WebPlatform implements PlatformAPI {
         if (ctx.state === 'suspended' && !this.audio.paused) ctx.resume();
       };
       this.audioCtx = ctx;
+      this.currentSource = source;
+      this.gainNode = gain;
       this.analyserNode = analyser;
       this.audio.addEventListener('volumechange', () => { gain.gain.value = this.audio.volume; });
     } catch { /* already created */ }
   }
 
   async play(_track: Track, url: string): Promise<void> {
+    if (this.preloadAudio && this.preloadUrl === url) {
+      const old = this.audio;
+      this.detachAudioEvents(old);
+      this.audio = this.preloadAudio;
+      this.audio.volume = old.volume;
+      this.preloadAudio = null;
+      this.preloadUrl = null;
+      this.attachAudioEvents(this.audio);
+      await this.initAudioPipeline();
+      try {
+        this.pendingPlay = this.audio.play();
+        await Promise.race([
+          this.pendingPlay,
+          new Promise<void>((_, reject) => setTimeout(() => reject(new Error('playback timeout')), 15000)),
+        ]);
+      } catch (e: unknown) {
+        if (e instanceof DOMException && e.name === 'AbortError' && !this.audio.paused) return;
+        throw e;
+      }
+      try { old.pause(); old.src = ''; } catch {}
+      return;
+    }
+    this.preloadAudio = null;
+    this.preloadUrl = null;
     this.audio.src = url;
     this.audio.load();
     await this.initAudioPipeline();
@@ -119,9 +181,7 @@ export class WebPlatform implements PlatformAPI {
         new Promise<void>((_, reject) => setTimeout(() => reject(new Error('playback timeout')), 15000)),
       ]);
     } catch (e: unknown) {
-      if (e instanceof DOMException && e.name === 'AbortError' && !this.audio.paused) {
-        return;
-      }
+      if (e instanceof DOMException && e.name === 'AbortError' && !this.audio.paused) return;
       console.warn('play failed:', e);
       throw e;
     }
@@ -169,6 +229,18 @@ export class WebPlatform implements PlatformAPI {
     this.audio.volume = volume;
   }
 
+  preload(url: string): void {
+    if (this.preloadAudio) {
+      this.preloadAudio.src = '';
+    }
+    this.preloadUrl = url;
+    this.preloadAudio = new Audio();
+    this.preloadAudio.crossOrigin = 'anonymous';
+    this.preloadAudio.preload = 'auto';
+    this.preloadAudio.src = url;
+    this.preloadAudio.load();
+  }
+
   async getPosition(): Promise<number> {
     return this.audio.currentTime;
   }
@@ -207,6 +279,11 @@ export class WebPlatform implements PlatformAPI {
     return () => this.bufferCallbacks.delete(callback);
   }
 
+  onBufferingChange(callback: (isBuffering: boolean) => void): () => void {
+    this.bufferingCallbacks.add(callback);
+    return () => this.bufferingCallbacks.delete(callback);
+  }
+
   onNext(callback: () => void): () => void {
     this.nextCallbacks.add(callback);
     return () => this.nextCallbacks.delete(callback);
@@ -215,6 +292,23 @@ export class WebPlatform implements PlatformAPI {
   onPrevious(callback: () => void): () => void {
     this.prevCallbacks.add(callback);
     return () => this.prevCallbacks.delete(callback);
+  }
+
+  async getServers(): Promise<ServerConfig[]> {
+    const data = localStorage.getItem(SERVERS_KEY);
+    return data ? JSON.parse(data) : [];
+  }
+
+  async saveServers(servers: ServerConfig[]): Promise<void> {
+    localStorage.setItem(SERVERS_KEY, JSON.stringify(servers));
+  }
+
+  async getLastServerId(): Promise<string | null> {
+    return localStorage.getItem(LAST_SERVER_KEY);
+  }
+
+  async setLastServerId(id: string): Promise<void> {
+    localStorage.setItem(LAST_SERVER_KEY, id);
   }
 
   async saveQueue(queue: PlayQueue): Promise<void> {

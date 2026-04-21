@@ -40,4 +40,68 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('updater-error', (_e, msg) => cb(msg));
     return () => ipcRenderer.removeAllListeners('updater-error');
   },
+
+  mpvDetect: () => ipcRenderer.invoke('mpv-detect'),
+  mpvStart: () => ipcRenderer.invoke('mpv-start'),
+  mpvStop: () => ipcRenderer.invoke('mpv-stop'),
+  mpvLoad: (url, opts) => ipcRenderer.invoke('mpv-load', url, opts),
+  mpvSetPause: (v) => ipcRenderer.invoke('mpv-set-pause', v),
+  mpvSeek: (v) => ipcRenderer.invoke('mpv-seek', v),
+  mpvSetVolume: (v) => ipcRenderer.invoke('mpv-set-volume', v),
+  mpvGetTime: () => ipcRenderer.invoke('mpv-get-time'),
+  mpvGetDuration: () => ipcRenderer.invoke('mpv-get-duration'),
+  mpvPlaylistNext: () => ipcRenderer.invoke('mpv-playlist-next'),
+  mpvStopPlayback: () => ipcRenderer.invoke('mpv-stop-playback'),
+
+  onMpvProperty: (cb) => {
+    ipcRenderer.on('mpv-property', (_e, data) => cb(data));
+    return () => ipcRenderer.removeAllListeners('mpv-property');
+  },
+  onMpvEndFile: (cb) => {
+    ipcRenderer.on('mpv-end-file', (_e, data) => cb(data));
+    return () => ipcRenderer.removeAllListeners('mpv-end-file');
+  },
+
+  mprisUpdateMetadata: (data) => ipcRenderer.send('mpris-update-metadata', data),
+  mprisUpdatePlayback: (status) => ipcRenderer.send('mpris-update-playback', status),
+  mprisUpdatePosition: (positionSec) => ipcRenderer.send('mpris-update-position', positionSec),
+  mprisUpdateVolume: (volume) => ipcRenderer.send('mpris-update-volume', volume),
+  mprisSeeked: (positionSec) => ipcRenderer.send('mpris-seeked', positionSec),
+
+  onMprisPlay: (cb) => {
+    ipcRenderer.on('mpris-play', () => cb());
+    return () => ipcRenderer.removeAllListeners('mpris-play');
+  },
+  onMprisPause: (cb) => {
+    ipcRenderer.on('mpris-pause', () => cb());
+    return () => ipcRenderer.removeAllListeners('mpris-pause');
+  },
+  onMprisPlayPause: (cb) => {
+    ipcRenderer.on('mpris-playpause', () => cb());
+    return () => ipcRenderer.removeAllListeners('mpris-playpause');
+  },
+  onMprisNext: (cb) => {
+    ipcRenderer.on('mpris-next', () => cb());
+    return () => ipcRenderer.removeAllListeners('mpris-next');
+  },
+  onMprisPrevious: (cb) => {
+    ipcRenderer.on('mpris-previous', () => cb());
+    return () => ipcRenderer.removeAllListeners('mpris-previous');
+  },
+  onMprisStop: (cb) => {
+    ipcRenderer.on('mpris-stop', () => cb());
+    return () => ipcRenderer.removeAllListeners('mpris-stop');
+  },
+  onMprisSeek: (cb) => {
+    ipcRenderer.on('mpris-seek', (_e, data) => cb(data));
+    return () => ipcRenderer.removeAllListeners('mpris-seek');
+  },
+  onMprisSetPosition: (cb) => {
+    ipcRenderer.on('mpris-set-position', (_e, data) => cb(data));
+    return () => ipcRenderer.removeAllListeners('mpris-set-position');
+  },
+  onMprisVolume: (cb) => {
+    ipcRenderer.on('mpris-volume', (_e, data) => cb(data));
+    return () => ipcRenderer.removeAllListeners('mpris-volume');
+  },
 });

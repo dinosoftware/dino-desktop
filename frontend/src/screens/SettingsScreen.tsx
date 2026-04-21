@@ -56,9 +56,6 @@ export function SettingsScreen() {
   const [scrobbleEnabled, setScrobbleEnabled] = useState(
     getSetting('dino_scrobble', true)
   );
-  const [gaplessPlayback, setGaplessPlayback] = useState(
-    getSetting('dino_gapless', true)
-  );
   const [wakeLock, setWakeLock] = useState(
     getSetting('dino_wake_lock', false)
   );
@@ -92,6 +89,10 @@ export function SettingsScreen() {
   const [discordRpcLastfmKey, setDiscordRpcLastfmKey] = useState<string>(
     getSetting('dino_discord_rpc_lastfm_key', '')
   );
+  const [mpvAvailable, setMpvAvailable] = useState<boolean | null>(null);
+  const [mpvEnabled, setMpvEnabled] = useState(
+    getSetting('dino_mpv', false)
+  );
 
   const handleQualityChange = (q: StreamingQuality) => {
     setStreamingQuality(q);
@@ -107,12 +108,6 @@ export function SettingsScreen() {
     const next = !scrobbleEnabled;
     setScrobbleEnabled(next);
     setSetting('dino_scrobble', next);
-  };
-
-  const handleGaplessToggle = () => {
-    const next = !gaplessPlayback;
-    setGaplessPlayback(next);
-    setSetting('dino_gapless', next);
   };
 
   const handleWakeLockToggle = () => {
@@ -183,6 +178,24 @@ export function SettingsScreen() {
     setDiscordRpcLastfmKey(v);
     setSetting('dino_discord_rpc_lastfm_key', v);
     refreshDiscordPresence(true);
+  };
+
+  useEffect(() => {
+    if (platform.isDesktop && platform.detectMpv) {
+      platform.detectMpv().then(setMpvAvailable);
+    }
+  }, [platform]);
+
+  const handleMpvToggle = async () => {
+    const next = !mpvEnabled;
+    if (next && platform.enableMpv) {
+      const ok = await platform.enableMpv();
+      if (!ok) return;
+    } else if (!next && platform.disableMpv) {
+      platform.disableMpv();
+    }
+    setMpvEnabled(next);
+    setSetting('dino_mpv', next);
   };
 
   const [showAddServer, setShowAddServer] = useState(false);
@@ -414,12 +427,25 @@ export function SettingsScreen() {
             checked={scrobbleEnabled}
             onChange={handleScrobbleToggle}
           />
-          <ToggleRow
-            label="Gapless playback"
-            description="Remove silence between tracks"
-            checked={gaplessPlayback}
-            onChange={handleGaplessToggle}
-          />
+          {platform.isDesktop && mpvAvailable === true && (
+            <ToggleRow
+              label="mpv audio backend"
+              description="Use mpv for gapless playback (requires mpv installed)"
+              checked={mpvEnabled}
+              onChange={handleMpvToggle}
+            />
+          )}
+          {platform.isDesktop && mpvAvailable === false && (
+            <div className="flex items-center justify-between gap-4 opacity-50">
+              <div className="min-w-0">
+                <p className="text-sm font-medium">mpv audio backend</p>
+                <p className="text-xs text-muted-foreground">Install mpv for gapless playback support</p>
+              </div>
+              <div className="w-11 h-6 rounded-full bg-muted relative flex-shrink-0">
+                <div className="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-muted-foreground/30" />
+              </div>
+            </div>
+          )}
           <ToggleRow
             label="Prevent sleep while playing"
             description="Keep screen awake during playback"

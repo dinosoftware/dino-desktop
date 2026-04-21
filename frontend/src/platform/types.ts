@@ -66,6 +66,7 @@ export interface PlatformAPI {
   stop(): Promise<void>;
   seek(position: number): Promise<void>;
   setVolume(volume: number): Promise<void>;
+  preload?(url: string): void;
   getPosition(): Promise<number>;
   getDuration(): Promise<number>;
   onPositionChange(callback: (position: number) => void): () => void;
@@ -74,6 +75,7 @@ export interface PlatformAPI {
   onTrackError(callback: (error: string) => void): () => void;
   onPlayStateChange(callback: (isPlaying: boolean) => void): () => void;
   onBufferChange(callback: (buffered: number) => void): () => void;
+  onBufferingChange?(callback: (isBuffering: boolean) => void): () => void;
   onNext(callback: () => void): () => void;
   onPrevious(callback: () => void): () => void;
 
@@ -136,4 +138,12 @@ export interface PlatformAPI {
   onUpdateDownloadProgress?(callback: (progress: DownloadProgress) => void): () => void;
   onUpdateDownloaded?(callback: () => void): () => void;
   onUpdateError?(callback: (error: string) => void): () => void;
+
+  // mpv backend (desktop only)
+  detectMpv?(): Promise<boolean>;
+  enableMpv?(): Promise<boolean>;
+  disableMpv?(): void;
+  isMpvEnabled?(): boolean;
+  mpvNext?(): Promise<void>;
+  consumeMpvAutoAdvanced?(): boolean;
 }

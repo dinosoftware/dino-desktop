@@ -10,7 +10,7 @@ import { LoginScreen, HomeScreen, LibraryScreen, SearchScreen, PlaylistsScreen, 
 function AppContent() {
   const platform = usePlatform();
   const { isAuthenticated, loadServers } = useAuthStore();
-  const { setPosition, setDuration, setIsPlaying, next, previous, handleTrackError, volume, loadQueueFromServer, setBuffered } = usePlayerStore();
+  const { setPosition, setDuration, setIsPlaying, next, previous, handleTrackError, volume, loadQueueFromServer, setBuffered, setBuffering } = usePlayerStore();
   const { setUpdateStatus, setUpdateInfo, setProgress, setError, setCanAutoUpdate } = useUpdateStore();
   const [initialized, setInitialized] = useState(false);
   
@@ -20,6 +20,14 @@ function AppContent() {
     initializeAuthStore(platform);
     initializePlayerStore(platform);
     connectDiscordRPC().then(() => refreshDiscordPresence());
+    if (platform.isDesktop && platform.enableMpv) {
+      const mpvSetting = localStorage.getItem('dino_mpv');
+      if (mpvSetting && JSON.parse(mpvSetting)) {
+        platform.detectMpv?.()?.then((available) => {
+          if (available) platform.enableMpv?.();
+        });
+      }
+    }
     loadServers().then(() => {
       setInitialized(true);
       loadQueueFromServer();
@@ -30,6 +38,7 @@ function AppContent() {
     const unsubPosition = platform.onPositionChange(setPosition);
     const unsubDuration = platform.onDurationChange(setDuration);
     const unsubBuffer = platform.onBufferChange(setBuffered);
+    const unsubBuffering = platform.onBufferingChange?.(setBuffering) ?? (() => {});
     const unsubEnd = platform.onTrackEnd(next);
     const unsubError = platform.onTrackError(handleTrackError);
     const unsubPlayState = platform.onPlayStateChange(setIsPlaying);
@@ -39,6 +48,7 @@ function AppContent() {
       unsubPosition();
       unsubDuration();
       unsubBuffer();
+      unsubBuffering();
       unsubEnd();
       unsubError();
       unsubPlayState();

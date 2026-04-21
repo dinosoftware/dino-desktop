@@ -4,7 +4,7 @@ import { usePlayerStore } from '@/stores';
 import { useAlbumActions } from '@/hooks';
 import { apiClient } from '@/api/client';
 import type { Track } from '@/api/types';
-import { Play, Pause, Music, ListPlus, Disc, User, Heart, Radio } from 'lucide-react';
+import { Play, Pause, Music, ListPlus, Disc, User, Heart, Radio, Download, Share2 } from 'lucide-react';
 import { ContextMenu, type ContextMenuItem } from '@/components/ContextMenu';
 import { cn, formatTime, getArtistDisplay } from '@/lib/utils';
 
@@ -42,6 +42,16 @@ export function TrackRow({ track, index, allTracks, showAlbum = true, showCover 
     }
   };
 
+  const handleShare = async () => {
+    const text = `${track.title} - ${getArtistDisplay(track).text || 'Unknown Artist'}`;
+    const url = apiClient.getServerUrl();
+    if (navigator.share) {
+      navigator.share({ title: track.title, text, url }).catch(() => {});
+    } else {
+      await navigator.clipboard.writeText(`${text}${url ? ` (${url})` : ''}`);
+    }
+  };
+
   const contextItems: ContextMenuItem[] = [
     { label: 'Play', icon: <Play className="h-4 w-4" />, onClick: handlePlay },
     { label: 'Play Next', icon: <ListPlus className="h-4 w-4" />, onClick: () => playTrackNext(track) },
@@ -51,6 +61,8 @@ export function TrackRow({ track, index, allTracks, showAlbum = true, showCover 
       if (songs.length > 0) usePlayerStore.getState().playQueue([track, ...songs]);
     }, divider: true },
     { label: track.starred ? 'Unstar' : 'Star', icon: <Heart className="h-4 w-4" />, onClick: () => toggleStar(track.id, !!track.starred) },
+    { label: 'Download', icon: <Download className="h-4 w-4" />, onClick: () => apiClient.downloadTrack(track).catch(() => {}), divider: true },
+    { label: 'Share', icon: <Share2 className="h-4 w-4" />, onClick: handleShare },
     ...(track.albumId ? [{ label: 'Go to Album', icon: <Disc className="h-4 w-4" />, onClick: () => navigate(`/album/${track.albumId}`), divider: true }] : []),
     ...(track.artistId ? [{ label: 'Go to Artist', icon: <User className="h-4 w-4" />, onClick: () => navigate(`/artist/${track.artistId}`) }] : []),
   ];
