@@ -146,4 +146,7 @@ export interface PlatformAPI {
   isMpvEnabled?(): boolean;
   mpvNext?(): Promise<void>;
   consumeMpvAutoAdvanced?(): boolean;
+
+  // App control (desktop only)
+  relaunchApp?(): Promise<void>;
 }

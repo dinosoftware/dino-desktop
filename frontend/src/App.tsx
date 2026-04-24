@@ -20,15 +20,17 @@ function AppContent() {
     initializeAuthStore(platform);
     initializePlayerStore(platform);
     connectDiscordRPC().then(() => refreshDiscordPresence());
-    if (platform.isDesktop && platform.enableMpv) {
-      const mpvSetting = localStorage.getItem('dino_mpv');
-      if (mpvSetting && JSON.parse(mpvSetting)) {
-        platform.detectMpv?.()?.then((available) => {
-          if (available) platform.enableMpv?.();
-        });
+    const mpvReady = (async () => {
+      if (platform.isDesktop && platform.enableMpv) {
+        const mpvSetting = localStorage.getItem('dino_mpv');
+        if (mpvSetting && JSON.parse(mpvSetting)) {
+          const available = await platform.detectMpv?.();
+          if (available) await platform.enableMpv?.();
+        }
       }
-    }
-    loadServers().then(() => {
+    })();
+    const serversReady = loadServers();
+    Promise.all([mpvReady, serversReady]).then(() => {
       setInitialized(true);
       loadQueueFromServer();
     }).catch(() => setInitialized(true));

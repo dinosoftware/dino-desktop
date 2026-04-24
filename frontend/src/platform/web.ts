@@ -156,6 +156,9 @@ export class WebPlatform implements PlatformAPI {
       this.preloadUrl = null;
       this.attachAudioEvents(this.audio);
       await this.initAudioPipeline();
+      if (this.audio.duration && isFinite(this.audio.duration)) {
+        this.durationCallbacks.forEach(cb => cb(this.audio.duration));
+      }
       try {
         this.pendingPlay = this.audio.play();
         await Promise.race([

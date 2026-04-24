@@ -349,6 +349,11 @@ function setupIpc() {
     return app.getVersion();
   });
 
+  ipcMain.handle('relaunch-app', () => {
+    app.relaunch();
+    app.exit(0);
+  });
+
   ipcMain.handle('mpv-detect', async () => {
     return new Promise((resolve) => {
       const p = spawn('mpv', ['--version'], { stdio: 'pipe' });
@@ -391,6 +396,11 @@ function setupIpc() {
   ipcMain.handle('mpv-load', async (_e, url, opts) => {
     if (!mpv) throw new Error('mpv not initialized');
     console.log('mpv-load:', url?.substring(0, 80), opts);
+    if (!mpv.sock) {
+      console.log('mpv-load: socket not ready, waiting...');
+      await new Promise(r => setTimeout(r, 500));
+      if (!mpv.sock) throw new Error('mpv not connected');
+    }
     mpv.loadFile(url, opts).catch((e) => console.error('mpv-load error:', e));
   });
   ipcMain.handle('mpv-set-pause', (_e, v) => { if (mpv) mpv.setPause(v).catch(() => {}); });
@@ -400,6 +410,7 @@ function setupIpc() {
   ipcMain.handle('mpv-get-duration', () => mpv?.props['duration'] ?? 0);
   ipcMain.handle('mpv-playlist-next', () => { if (mpv) mpv.playlistNext().catch(() => {}); });
   ipcMain.handle('mpv-stop-playback', () => { if (mpv) mpv.stop().catch(() => {}); });
+  ipcMain.handle('mpv-playlist-clear', () => { if (mpv) mpv.playlistClear().catch(() => {}); });
 
   ipcMain.on('mpris-update-metadata', (_e, data) => {
     if (!mprisPlayer) return;

@@ -188,14 +188,25 @@ export function SettingsScreen() {
 
   const handleMpvToggle = async () => {
     const next = !mpvEnabled;
+    setSetting('dino_mpv', next);
+    setMpvEnabled(next);
+
     if (next && platform.enableMpv) {
       const ok = await platform.enableMpv();
-      if (!ok) return;
+      if (!ok) {
+        setMpvEnabled(false);
+        setSetting('dino_mpv', false);
+        return;
+      }
     } else if (!next && platform.disableMpv) {
       platform.disableMpv();
     }
-    setMpvEnabled(next);
-    setSetting('dino_mpv', next);
+
+    if (platform.relaunchApp) {
+      try {
+        await platform.relaunchApp();
+      } catch { /* relaunch failed */ }
+    }
   };
 
   const [showAddServer, setShowAddServer] = useState(false);

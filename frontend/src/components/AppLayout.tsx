@@ -298,6 +298,8 @@ export function AppLayout({ children }: AppLayoutProps) {
 
   const sidebarHideCover = windowHeight < 680;
   const compactExpanded = windowHeight < 580 || (windowHeight < 700 && windowWidth < 900);
+  const miniCompact = windowWidth < 720;
+  const miniVeryCompact = windowWidth < 560;
 
   const fetchingLyricsForId = useRef<string | null>(null);
 
@@ -844,7 +846,7 @@ export function AppLayout({ children }: AppLayoutProps) {
         >
           <div className="flex items-center h-[72px]">
             {/* LEFT: cover + info stack + menu */}
-            <div className="flex items-center gap-3 pl-3 w-[320px] flex-shrink-0">
+            <div className={cn("flex items-center gap-3 pl-3 flex-shrink-0", miniVeryCompact ? "w-[52px]" : miniCompact ? "w-[200px]" : "w-[320px]")}>
               <div
                 onClick={() => currentTrack && setPlayerMode('expanded')}
                 className="h-12 w-12 rounded-lg bg-muted flex items-center justify-center overflow-hidden flex-shrink-0 cursor-pointer"
@@ -855,15 +857,17 @@ export function AppLayout({ children }: AppLayoutProps) {
                   <Music className="h-4 w-4 text-muted-foreground" />
                 )}
               </div>
-              <div className="min-w-0 w-[220px]" onClick={() => currentTrack && setPlayerMode('expanded')} style={{ cursor: currentTrack ? 'pointer' : 'default' }}>
+              {!miniVeryCompact && (
+              <div className={cn("min-w-0", miniCompact ? "w-[110px]" : "w-[220px]")} onClick={() => currentTrack && setPlayerMode('expanded')} style={{ cursor: currentTrack ? 'pointer' : 'default' }}>
                 <div className="flex items-center gap-1.5">
                   <MarqueeText className="text-sm font-semibold">{currentTrack?.title ?? 'No track playing'}</MarqueeText>
-                  {currentTrack && <span onClick={(e) => { e.stopPropagation(); qualityBadge.toggleDetail(); }} className="px-1 py-0.5 rounded text-[8px] font-bold tracking-wide cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0" style={{ border: '1px solid hsl(var(--muted-foreground))', color: 'hsl(var(--muted-foreground))' }}>{qualityBadge.text}</span>}
+                  {!miniCompact && currentTrack && <span onClick={(e) => { e.stopPropagation(); qualityBadge.toggleDetail(); }} className="px-1 py-0.5 rounded text-[8px] font-bold tracking-wide cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0" style={{ border: '1px solid hsl(var(--muted-foreground))', color: 'hsl(var(--muted-foreground))' }}>{qualityBadge.text}</span>}
                 </div>
-                <MarqueeText className="text-xs text-muted-foreground">{currentTrack ? getArtistDisplay(currentTrack).text : '—'}</MarqueeText>
-                {currentTrack?.album && <MarqueeText className="text-[10px] text-muted-foreground/60">{currentTrack.album}</MarqueeText>}
+                {!miniCompact && <MarqueeText className="text-xs text-muted-foreground">{currentTrack ? getArtistDisplay(currentTrack).text : '—'}</MarqueeText>}
+                {!miniCompact && currentTrack?.album && <MarqueeText className="text-[10px] text-muted-foreground/60">{currentTrack.album}</MarqueeText>}
               </div>
-              {currentTrack && (
+              )}
+              {!miniVeryCompact && currentTrack && (
               <ContextMenu items={getCurrentTrackContextItems()} trigger="click">
                 <button
                   className="p-1.5 rounded-full transition-colors text-muted-foreground hover:text-foreground hover:bg-accent flex-shrink-0"
@@ -906,7 +910,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                   {repeat === 'one' && <span className="absolute -top-0.5 -right-0.5 text-[6px] font-black text-primary">1</span>}
                 </button>
               </div>
-              <div className="flex items-center gap-2 w-64">
+              <div className={cn("flex items-center gap-2", miniCompact ? "w-44" : "w-64")}>
                 <span className="text-[10px] text-muted-foreground tabular-nums w-8 text-right">{formatTime(position)}</span>
                 <div className="flex-1 cursor-pointer h-1 rounded-full relative">
                   <div className="absolute inset-0 rounded-full" style={{ backgroundColor: 'var(--slider-track)' }} />
@@ -926,10 +930,11 @@ export function AppLayout({ children }: AppLayoutProps) {
             </div>
 
             {/* RIGHT: volume + queue */}
-            <div className="flex items-center gap-2 pr-3 w-[200px] flex-shrink-0">
+            <div className={cn("flex items-center gap-2 pr-3 flex-shrink-0", miniCompact ? "w-auto" : "w-[200px]")}>
               <button onClick={() => setVolume(volume > 0 ? 0 : 1)} className="p-1.5 text-muted-foreground hover:text-foreground transition-colors">
                 {volume === 0 ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
               </button>
+              {!miniCompact && (
               <div className="w-24">
                 <SliderBar
                   value={volume}
@@ -946,6 +951,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                   onWheel={(e) => setVolume(Math.max(0, Math.min(1, volume + (e.deltaY < 0 ? 0.05 : -0.05))))}
                 />
               </div>
+              )}
               <button onClick={() => setShowQueue(!showQueue)} className="p-1.5 rounded-full transition-colors" style={{ color: showQueue ? 'hsl(var(--primary))' : 'hsl(var(--muted-foreground))' }}>
                 <List className="h-4 w-4" />
               </button>

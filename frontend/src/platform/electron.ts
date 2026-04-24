@@ -48,6 +48,8 @@ declare global {
       mpvGetDuration(): Promise<number>;
       mpvPlaylistNext(): Promise<void>;
       mpvStopPlayback(): Promise<void>;
+      mpvPlaylistClear(): Promise<void>;
+      relaunchApp(): Promise<void>;
       onMpvProperty(cb: (data: { name: string; data: unknown }) => void): () => void;
       onMpvEndFile(cb: (data: { reason: string }) => void): () => void;
 
@@ -326,6 +328,9 @@ export class ElectronPlatform implements PlatformAPI {
       this.preloadUrl = null;
       this.attachAudioEvents(this.audio);
       await this.initAudioPipeline();
+      if (this.audio.duration && isFinite(this.audio.duration)) {
+        this.durationCallbacks.forEach(cb => cb(this.audio.duration));
+      }
       try {
         this.pendingPlay = this.audio.play();
         await Promise.race([
@@ -417,6 +422,7 @@ export class ElectronPlatform implements PlatformAPI {
       if (this.mpvLastPreloadedUrl === url) return;
       this.mpvLastPreloadedUrl = url;
       this.mpvPreloadedNext = true;
+      window.electronAPI.mpvPlaylistClear();
       window.electronAPI.mpvLoad(url, { append: true });
       return;
     }
@@ -656,8 +662,16 @@ export class ElectronPlatform implements PlatformAPI {
     if (this.useMpv && this.mpvReady) return true;
     const ok = await window.electronAPI.mpvStart();
     if (!ok) return false;
+    try { this.audio.pause(); } catch {}
     this.useMpv = true;
     this.mpvReady = true;
+    this.mpvPosition = 0;
+    this.mpvDuration = 0;
+    this.mpvPaused = true;
+    this.mpvPreloadedNext = false;
+    this.mpvAutoAdvanced = false;
+    this.mpvInAutoAdvanceTransition = false;
+    this.mpvLastPreloadedUrl = null;
     this.setupMpvListeners();
     window.electronAPI.mpvSetVolume(this.audio.volume);
     return true;
@@ -669,6 +683,13 @@ export class ElectronPlatform implements PlatformAPI {
     window.electronAPI.mpvStop().catch(() => {});
     this.useMpv = false;
     this.mpvReady = false;
+    this.mpvPosition = 0;
+    this.mpvDuration = 0;
+    this.mpvPaused = true;
+    this.mpvPreloadedNext = false;
+    this.mpvAutoAdvanced = false;
+    this.mpvInAutoAdvanceTransition = false;
+    this.mpvLastPreloadedUrl = null;
     this.mprisSetPlayback('Stopped');
   }
 
@@ -730,5 +751,9 @@ export class ElectronPlatform implements PlatformAPI {
     if (this.useMpv && this.mpvReady) {
       await window.electronAPI.mpvPlaylistNext();
     }
+  }
+
+  async relaunchApp(): Promise<void> {
+    await window.electronAPI.relaunchApp();
   }
 }
