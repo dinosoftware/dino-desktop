@@ -35,6 +35,7 @@ import {
   Upload,
   MoreVertical,
   GripVertical,
+  Share2,
 } from 'lucide-react';
 import { apiClient } from '@/api/client';
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
@@ -43,6 +44,7 @@ import { AudioVisualizer } from '@/components/AudioVisualizer';
 import type { StructuredLyrics, Track } from '@/api/types';
 import { useAlbumActions } from '@/hooks/useAlbumActions';
 import { usePlatform } from '@/platform';
+import { useToastStore } from '@/stores/toastStore';
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -185,7 +187,7 @@ function MarqueeText({ children, className, style }: { children: React.ReactNode
     return (
       <div ref={outerRef} className={className} style={{ overflow: 'hidden', ...style }}>
         <span ref={innerRef} className="truncate block">{children}</span>
-      </div>
+    </div>
     );
   }
 
@@ -482,13 +484,36 @@ export function AppLayout({ children }: AppLayoutProps) {
     return queue.slice(currentIndex + 1);
   }, [queue, currentIndex]);
 
+  const sharesEnabled = (() => { try { const v = localStorage.getItem('dino_shares'); return v ? JSON.parse(v) : true; } catch { return true; } })();
+
   const navItems = [
     { id: '/', icon: Home, label: 'Home' },
     { id: '/library', icon: Library, label: 'Library' },
     { id: '/search', icon: Search, label: 'Search' },
     { id: '/favorites', icon: Heart, label: 'Favorites' },
     { id: '/playlists', icon: ListMusic, label: 'Playlists' },
+    ...(sharesEnabled ? [{ id: '/shares', icon: Share2, label: 'Shares' }] : []),
   ];
+
+  const toast = useToastStore();
+  const copyToClipboard = async (text: string) => {
+    if (platform.writeClipboard) {
+      await platform.writeClipboard(text);
+    } else {
+      await navigator.clipboard.writeText(text);
+    }
+    toast.showToast('Link copied!', 'share');
+  };
+
+  const handleShareCurrentTrack = async () => {
+    if (!currentTrack) return;
+    const shareEnabled = (() => { try { const v = localStorage.getItem('dino_shares'); return v ? JSON.parse(v) : true; } catch { return true; } })();
+    if (!shareEnabled) return;
+    const share = await apiClient.createShare([currentTrack.id], `${currentTrack.title} - ${getArtistDisplay(currentTrack).text || 'Unknown Artist'}`);
+    if (share?.url) {
+      await copyToClipboard(share.url);
+    }
+  };
 
   const getQueueContextItems = (track: typeof queue[0], idx: number): ContextMenuItem[] => [
     { label: 'Play', icon: <Play className="h-4 w-4" />, onClick: () => handlePlayFromQueue(idx) },
@@ -497,6 +522,14 @@ export function AppLayout({ children }: AppLayoutProps) {
     { label: 'Instant Mix', icon: <Radio className="h-4 w-4" />, onClick: async () => {
       const songs = await apiClient.getSimilarSongs(track.id);
       if (songs.length > 0) usePlayerStore.getState().playQueue([track, ...songs]);
+    } },
+    { label: track.starred ? 'Unstar' : 'Star', icon: <Heart className="h-4 w-4" />, onClick: () => toggleStar(track.id, !!track.starred) },
+    { label: 'Download', icon: <Download className="h-4 w-4" />, onClick: () => apiClient.downloadTrack(track).catch(() => {}), divider: true },
+    { label: 'Share', icon: <Share2 className="h-4 w-4" />, onClick: async () => {
+      const shareEnabled = (() => { try { const v = localStorage.getItem('dino_shares'); return v ? JSON.parse(v) : true; } catch { return true; } })();
+      if (!shareEnabled) return;
+      const share = await apiClient.createShare([track.id], `${track.title} - ${getArtistDisplay(track).text || 'Unknown Artist'}`);
+      if (share?.url) await copyToClipboard(share.url);
     } },
     ...(track.albumId ? [{ label: 'Go to Album', icon: <Disc className="h-4 w-4" />, onClick: () => { navigate(`/album/${track.albumId}`); if (playerMode !== 'mini') setPlayerMode('mini'); }, divider: true }] : []),
     ...(track.artistId ? [{ label: 'Go to Artist', icon: <User className="h-4 w-4" />, onClick: () => { navigate(`/artist/${track.artistId}`); if (playerMode !== 'mini') setPlayerMode('mini'); } }] : []),
@@ -514,6 +547,8 @@ export function AppLayout({ children }: AppLayoutProps) {
         if (songs.length > 0) usePlayerStore.getState().playQueue([currentTrack, ...songs]);
       }, divider: true },
       { label: currentTrack.starred ? 'Unstar' : 'Star', icon: <Heart className="h-4 w-4" />, onClick: () => toggleStar(currentTrack.id, !!currentTrack.starred) },
+      { label: 'Download', icon: <Download className="h-4 w-4" />, onClick: () => apiClient.downloadTrack(currentTrack).catch(() => {}), divider: true },
+      { label: 'Share', icon: <Share2 className="h-4 w-4" />, onClick: handleShareCurrentTrack },
       ...(currentTrack.albumId ? [{ label: 'Go to Album', icon: <Disc className="h-4 w-4" />, onClick: () => { navigate(`/album/${currentTrack.albumId}`); if (playerMode !== 'mini') setPlayerMode('mini'); }, divider: true }] : []),
       ...(currentTrack.artistId ? [{ label: 'Go to Artist', icon: <User className="h-4 w-4" />, onClick: () => { navigate(`/artist/${currentTrack.artistId}`); if (playerMode !== 'mini') setPlayerMode('mini'); } }] : []),
     ];
@@ -522,6 +557,7 @@ export function AppLayout({ children }: AppLayoutProps) {
   const isPlayerOpen = playerMode !== 'mini';
 
   return (
+    <>
     <div className="flex h-screen bg-background">
       <aside className={cn(
         'bg-card flex flex-col transition-all duration-300 flex-shrink-0',
@@ -1280,6 +1316,12 @@ export function AppLayout({ children }: AppLayoutProps) {
         </div>
       )}
     </div>
+    {toast.message && (
+      <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[100] px-4 py-2 rounded-lg shadow-lg text-sm font-medium animate-fade-in" style={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}>
+        <span className="flex items-center gap-2 text-primary"><Share2 className="h-4 w-4" />{toast.message}</span>
+      </div>
+    )}
+    </>
   );
 }
 

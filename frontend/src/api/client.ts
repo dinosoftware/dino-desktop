@@ -1,5 +1,5 @@
 import md5 from 'blueimp-md5';
-import type { SubsonicResponse, GetLyricsResponse, GetArtistInfo2Response, GetArtistResponse, GetAlbumInfo2Response, StructuredLyrics, ArtistInfo2, ArtistWithAlbumsID3, AlbumInfo, SimilarSongs2Response, TopSongsResponse, Track, GetPlayQueueResponse, SavePlayQueueResponse } from './types';
+import type { SubsonicResponse, GetLyricsResponse, GetArtistInfo2Response, GetArtistResponse, GetAlbumInfo2Response, StructuredLyrics, ArtistInfo2, ArtistWithAlbumsID3, AlbumInfo, SimilarSongs2Response, TopSongsResponse, Track, GetPlayQueueResponse, SavePlayQueueResponse, Share, GetSharesResponse, CreateShareResponse } from './types';
 
 const API_VERSION = '1.16.1';
 const CLIENT_NAME = 'DinoDesktop';
@@ -359,6 +359,41 @@ class APIClient {
     } catch {
       return { entries: [] };
     }
+  }
+
+  async createShare(trackIds: string[], description?: string, expires?: number): Promise<Share | null> {
+    try {
+      const data = await this.request<CreateShareResponse>('createShare', {
+        id: trackIds,
+        ...(description ? { description } : {}),
+        ...(expires ? { expires } : {}),
+      });
+      const shares = data.shares?.share;
+      return (shares && shares.length > 0) ? shares[0] : null;
+    } catch {
+      return null;
+    }
+  }
+
+  async getShares(): Promise<Share[]> {
+    try {
+      const data = await this.request<GetSharesResponse>('getShares');
+      return data.shares?.share || [];
+    } catch {
+      return [];
+    }
+  }
+
+  async updateShare(shareId: string, params: { description?: string; expires?: number }): Promise<void> {
+    await this.request<object>('updateShare', {
+      id: shareId,
+      ...(params.description !== undefined ? { description: params.description } : {}),
+      ...(params.expires !== undefined ? { expires: params.expires } : {}),
+    });
+  }
+
+  async deleteShare(shareId: string): Promise<void> {
+    await this.request<object>('deleteShare', { id: shareId });
   }
 }
 

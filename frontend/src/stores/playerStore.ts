@@ -64,6 +64,10 @@ let scrobbleSubmitted = false;
 let wakeLockRef: WakeLockSentinel | null = null;
 let mpvLastPreloadedIndex = -1;
 
+function invalidateMpvPreload() {
+  mpvLastPreloadedIndex = -1;
+}
+
 async function requestWakeLock() {
   if (!('wakeLock' in navigator)) return;
   try {
@@ -628,6 +632,8 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       queue: [...state.queue, ...tracks],
       originalQueue: [...state.originalQueue, ...tracks],
     }));
+    invalidateMpvPreload();
+    preloadNext();
     saveQueueToServer();
   },
 
@@ -644,6 +650,8 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       );
       return { queue: newQueue, originalQueue: newOriginal };
     });
+    invalidateMpvPreload();
+    preloadNext();
     saveQueueToServer();
   },
 
@@ -665,6 +673,8 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       }
       return { queue, queueIndex };
     });
+    invalidateMpvPreload();
+    preloadNext();
     saveQueueToServer();
   },
 
@@ -684,11 +694,14 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       }
       return { queue, queueIndex };
     });
+    invalidateMpvPreload();
+    preloadNext();
     saveQueueToServer();
   },
 
   clearQueue: () => {
     set({ queue: [], originalQueue: [], queueIndex: -1, currentTrack: null, isPlaying: false });
+    invalidateMpvPreload();
     saveQueueToServer();
   },
 

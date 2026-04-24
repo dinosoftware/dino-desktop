@@ -4,11 +4,13 @@ import { apiClient } from '@/api/client';
 import { usePlayerStore, useCacheStore } from '@/stores';
 import { useAlbumActions } from '@/hooks';
 import type { Track, Album, GetArtistResponse, GetAlbumResponse, ArtistInfo2, ArtistWithAlbumsID3 } from '@/api/types';
-import { Play, Pause, Shuffle, ArrowLeft, Music, ExternalLink, ListPlus, Heart, Disc, User, Radio } from 'lucide-react';
+import { Play, Pause, Shuffle, ArrowLeft, Music, ExternalLink, ListPlus, Heart, Disc, User, Radio, Download, Share2 } from 'lucide-react';
 import { cn, formatTime, getArtistDisplay } from '@/lib/utils';
 import { LoadingScreen } from '@/components/ui';
-import { AlbumCard } from '@/components';
 import { ContextMenu, type ContextMenuItem } from '@/components/ContextMenu';
+import { usePlatform } from '@/platform';
+import { useToastStore } from '@/stores/toastStore';
+import { AlbumCard } from '@/components';
 
 export function ArtistScreen() {
   const { id } = useParams<{ id: string }>();
@@ -16,6 +18,17 @@ export function ArtistScreen() {
   const { currentTrack, isPlaying, playQueue, pause, addToQueue } = usePlayerStore();
   const { getArtist, setArtist } = useCacheStore();
   const { playTrackNext, toggleStar } = useAlbumActions();
+  const platform = usePlatform();
+  const toast = useToastStore();
+
+  const copyToClipboard = async (text: string) => {
+    if (platform.writeClipboard) {
+      await platform.writeClipboard(text);
+    } else {
+      try { await navigator.clipboard.writeText(text); } catch { /* ignore */ }
+    }
+    toast.showToast('Link copied!', 'share');
+  };
   const [artist, setArtistState] = useState<ArtistWithAlbumsID3 | null>(null);
   const [artistInfo, setArtistInfo] = useState<ArtistInfo2 | null>(null);
   const [topSongs, setTopSongs] = useState<Track[]>([]);
@@ -253,7 +266,14 @@ export function ArtistScreen() {
                   const songs = await apiClient.getSimilarSongs(track.id);
                   if (songs.length > 0) playQueue([track, ...songs]);
                 }, divider: true },
-                { label: track.starred ? 'Unstar' : 'Star', icon: <Heart className="h-4 w-4" />, onClick: () => toggleStar(track.id, !!track.starred) },
+                { label: track.starred ? 'Unstar' : 'Star', icon: <Heart className="h-4 w-4" />, onClick: () => toggleStar(track.id, !!track.starred), divider: true },
+                { label: 'Download', icon: <Download className="h-4 w-4" />, onClick: () => apiClient.downloadTrack(track).catch(() => { /* ignore */ }) },
+                { label: 'Share', icon: <Share2 className="h-4 w-4" />, onClick: async () => {
+                  const shareEnabled = (() => { try { const v = localStorage.getItem('dino_shares'); return v ? JSON.parse(v) : true; } catch { return true; } })();
+                  if (!shareEnabled) return;
+                  const share = await apiClient.createShare([track.id], `${track.title} - ${getArtistDisplay(track).text || 'Unknown Artist'}`);
+                  if (share?.url) await copyToClipboard(share.url);
+                } },
                 ...(track.albumId ? [{ label: 'Go to Album', icon: <Disc className="h-4 w-4" />, onClick: () => navigate(`/album/${track.albumId}`), divider: true }] : []),
               ];
 

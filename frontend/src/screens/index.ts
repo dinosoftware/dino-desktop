@@ -7,3 +7,4 @@ export { FavoritesScreen } from './FavoritesScreen';
 export { SettingsScreen } from './SettingsScreen';
 export { AlbumScreen } from './AlbumScreen';
 export { ArtistScreen } from './ArtistScreen';
+export { SharesScreen } from './SharesScreen';

@@ -246,6 +246,8 @@ function setupIpc() {
   ipcMain.handle('close-window', () => { if (mainWindow) mainWindow.close(); });
   ipcMain.handle('is-window-maximized', () => mainWindow ? mainWindow.isMaximized() : false);
 
+  ipcMain.handle('write-clipboard', (_e, text) => { require('electron').clipboard.writeText(text); });
+
   ipcMain.handle('discord-connect', async (_e, inputClientId) => {
     const clientId = inputClientId || '797506661857099858';
     try {

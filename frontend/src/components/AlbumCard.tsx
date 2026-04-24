@@ -4,9 +4,11 @@ import { usePlayerStore } from '@/stores';
 import { useAlbumActions } from '@/hooks';
 import { apiClient } from '@/api/client';
 import type { Album } from '@/api/types';
-import { Play, Pause, Music, ListPlus, Disc, User, Heart, Shuffle } from 'lucide-react';
+import { Play, Pause, Music, ListPlus, Disc, User, Heart, Shuffle, Share2 } from 'lucide-react';
 import { ContextMenu, type ContextMenuItem } from '@/components/ContextMenu';
 import { cn, getArtistDisplay } from '@/lib/utils';
+import { usePlatform } from '@/platform';
+import { useToastStore } from '@/stores/toastStore';
 
 interface AlbumCardProps {
   album: Album;
@@ -17,6 +19,8 @@ export function AlbumCard({ album, onClick }: AlbumCardProps) {
   const navigate = useNavigate();
   const { currentTrack, isPlaying, pause } = usePlayerStore();
   const { playAlbum, shuffleAlbum, playAlbumNext, addAlbumToQueue, toggleStar } = useAlbumActions();
+  const platform = usePlatform();
+  const toast = useToastStore();
 
   const coverUrl = useMemo(() =>
     album.coverArt ? apiClient.buildCoverArtUrl(album.coverArt, 300) : null,
@@ -48,6 +52,16 @@ export function AlbumCard({ album, onClick }: AlbumCardProps) {
     { label: 'Play Next', icon: <ListPlus className="h-4 w-4" />, onClick: () => playAlbumNext(album.id) },
     { label: 'Add to Queue', icon: <ListPlus className="h-4 w-4" />, onClick: () => addAlbumToQueue(album.id) },
     { label: album.starred ? 'Unstar' : 'Star', icon: <Heart className="h-4 w-4" />, onClick: () => toggleStar(album.id, !!album.starred), divider: true },
+    { label: 'Share', icon: <Share2 className="h-4 w-4" />, onClick: async () => {
+      const shareEnabled = (() => { try { const v = localStorage.getItem('dino_shares'); return v ? JSON.parse(v) : true; } catch { return true; } })();
+      if (!shareEnabled) return;
+      const share = await apiClient.createShare([album.id], album.name);
+      if (share?.url) {
+        if (platform.writeClipboard) { await platform.writeClipboard(share.url); }
+        else { try { await navigator.clipboard.writeText(share.url); } catch { /* ignore */ } }
+        toast.showToast('Link copied!', 'share');
+      }
+    } },
     { label: 'Go to Album', icon: <Disc className="h-4 w-4" />, onClick: handleNavigate, divider: true },
     ...(album.artistId ? [{ label: 'Go to Artist', icon: <User className="h-4 w-4" />, onClick: () => navigate(`/artist/${album.artistId}`) }] : []),
   ];

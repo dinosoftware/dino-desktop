@@ -2,14 +2,18 @@ import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { apiClient } from '@/api/client';
 import { usePlayerStore } from '@/stores';
 import type { Playlist, PlaylistWithSongs, GetPlaylistsResponse, GetPlaylistResponse, Track } from '@/api/types';
-import { Music, Play, ListMusic, ArrowLeft, Plus, Shuffle, Trash2, Pencil, Check, X, GripVertical, Save } from 'lucide-react';
+import { Music, Play, ListMusic, ArrowLeft, Plus, Shuffle, Trash2, Pencil, Check, X, GripVertical, Save, Share2 } from 'lucide-react';
 import { LoadingScreen } from '@/components/ui';
 import { TrackRow } from '@/components';
 import { formatTime } from '@/lib/utils';
 import { cn } from '@/lib/utils';
+import { usePlatform } from '@/platform';
+import { useToastStore } from '@/stores/toastStore';
 
 export function PlaylistsScreen() {
   const { playQueue } = usePlayerStore();
+  const platform = usePlatform();
+  const toast = useToastStore();
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [selectedPlaylist, setSelectedPlaylist] = useState<PlaylistWithSongs | null>(null);
   const [tracks, setTracks] = useState<Track[]>([]);
@@ -178,8 +182,7 @@ export function PlaylistsScreen() {
       await loadPlaylistTracks({ ...selectedPlaylist, name: editName.trim() });
       await loadPlaylists();
       setEditing(false);
-    } catch {
-    } finally {
+    } catch { /* ignore */ } finally {
       setSaving(false);
     }
   }, [selectedPlaylist, tracks, editName, editComment, editTracks]);
@@ -307,6 +310,21 @@ export function PlaylistsScreen() {
                       </div>
                     </div>
                     <div className="flex items-center gap-1 mt-2 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        onClick={async () => {
+                          const shareEnabled = (() => { try { const v = localStorage.getItem('dino_shares'); return v ? JSON.parse(v) : true; } catch { return true; } })();
+                          if (!shareEnabled) return;
+                          const share = await apiClient.createShare([playlist.id], playlist.name);
+                          if (share?.url) {
+                            if (platform.writeClipboard) { await platform.writeClipboard(share.url); }
+                            else { try { await navigator.clipboard.writeText(share.url); } catch { /* ignore */ } }
+                            toast.showToast('Link copied!', 'share');
+                          }
+                        }}
+                        className="p-1.5 text-muted-foreground hover:text-foreground rounded-md hover:bg-accent transition-colors"
+                      >
+                        <Share2 className="h-3.5 w-3.5" />
+                      </button>
                       <button
                         onClick={() => { setRenamingId(playlist.id); setRenameValue(playlist.name); }}
                         className="p-1.5 text-muted-foreground hover:text-foreground rounded-md hover:bg-accent transition-colors"

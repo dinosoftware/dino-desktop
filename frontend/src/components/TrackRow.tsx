@@ -1,8 +1,10 @@
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { usePlayerStore } from '@/stores';
+import { useToastStore } from '@/stores/toastStore';
 import { useAlbumActions } from '@/hooks';
 import { apiClient } from '@/api/client';
+import { usePlatform } from '@/platform';
 import type { Track } from '@/api/types';
 import { Play, Pause, Music, ListPlus, Disc, User, Heart, Radio, Download, Share2 } from 'lucide-react';
 import { ContextMenu, type ContextMenuItem } from '@/components/ContextMenu';
@@ -19,6 +21,8 @@ interface TrackRowProps {
 
 export function TrackRow({ track, index, allTracks, showAlbum = true, showCover = true, onPlay }: TrackRowProps) {
   const navigate = useNavigate();
+  const platform = usePlatform();
+  const toast = useToastStore();
   const { currentTrack, isPlaying, pause, playQueue } = usePlayerStore();
   const { playTrackNext, toggleStar } = useAlbumActions();
 
@@ -43,12 +47,18 @@ export function TrackRow({ track, index, allTracks, showAlbum = true, showCover 
   };
 
   const handleShare = async () => {
-    const text = `${track.title} - ${getArtistDisplay(track).text || 'Unknown Artist'}`;
-    const url = apiClient.getServerUrl();
-    if (navigator.share) {
-      navigator.share({ title: track.title, text, url }).catch(() => {});
-    } else {
-      await navigator.clipboard.writeText(`${text}${url ? ` (${url})` : ''}`);
+    const shareEnabled = (() => { try { const v = localStorage.getItem('dino_shares'); return v ? JSON.parse(v) : true; } catch { return true; } })();
+    if (!shareEnabled) return;
+    const share = await apiClient.createShare([track.id], `${track.title} - ${getArtistDisplay(track).text || 'Unknown Artist'}`);
+    if (share?.url) {
+      if (platform.writeClipboard) {
+        await platform.writeClipboard(share.url);
+      } else {
+        try { await navigator.clipboard.writeText(share.url); } catch {
+          if (navigator.share) { navigator.share({ title: track.title, url: share.url }).catch(() => {}); return; }
+        }
+      }
+      toast.showToast('Link copied!', 'share');
     }
   };
 

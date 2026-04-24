@@ -4,10 +4,12 @@ import { apiClient } from '@/api/client';
 import { usePlayerStore, useCacheStore } from '@/stores';
 import { useAlbumActions } from '@/hooks';
 import type { AlbumWithSongsID3, GetAlbumResponse } from '@/api/types';
-import { Play, Pause, Shuffle, ArrowLeft, Clock, Music, Heart, ListPlus, User, Disc, Radio } from 'lucide-react';
+import { Play, Pause, Shuffle, ArrowLeft, Clock, Music, Heart, ListPlus, User, Disc, Radio, Download, Share2 } from 'lucide-react';
 import { cn, formatTime, getArtistDisplay } from '@/lib/utils';
 import { LoadingScreen } from '@/components/ui';
 import { ContextMenu, type ContextMenuItem } from '@/components/ContextMenu';
+import { usePlatform } from '@/platform';
+import { useToastStore } from '@/stores/toastStore';
 
 export function AlbumScreen() {
   const { id } = useParams<{ id: string }>();
@@ -15,6 +17,17 @@ export function AlbumScreen() {
   const { currentTrack, isPlaying, playQueue, pause, addToQueue } = usePlayerStore();
   const { getAlbum, setAlbum } = useCacheStore();
   const { playTrackNext, toggleStar } = useAlbumActions();
+  const platform = usePlatform();
+  const toast = useToastStore();
+
+  const copyToClipboard = async (text: string) => {
+    if (platform.writeClipboard) {
+      await platform.writeClipboard(text);
+    } else {
+      try { await navigator.clipboard.writeText(text); } catch { /* ignore */ }
+    }
+    toast.showToast('Link copied!', 'share');
+  };
 
   const [album, setAlbumState] = useState<AlbumWithSongsID3 | null>(null);
   const [tracks, setTracks] = useState<import('@/api/types').Track[]>([]);
@@ -147,6 +160,19 @@ export function AlbumScreen() {
                   >
                     <Shuffle className="h-4 w-4" /> Shuffle
                   </button>
+                  {(() => { try { const v = localStorage.getItem('dino_shares'); return v ? JSON.parse(v) : true; } catch { return true; } })() && (
+                    <button
+                      onClick={async () => {
+                        const share = await apiClient.createShare([album.id], album.name);
+                        if (share?.url) await copyToClipboard(share.url);
+                      }}
+                      className="px-6 py-2.5 border border-border rounded-full font-medium active:scale-95 transition-all flex items-center gap-2 text-sm"
+                      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'hsl(var(--accent))'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = ''; }}
+                    >
+                      <Share2 className="h-4 w-4" /> Share
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -174,7 +200,14 @@ export function AlbumScreen() {
                   if (songs.length > 0) playQueue([track, ...songs]);
                 }, divider: true
               },
-              { label: track.starred ? 'Unstar' : 'Star', icon: <Heart className="h-4 w-4" />, onClick: () => toggleStar(track.id, !!track.starred) },
+              { label: track.starred ? 'Unstar' : 'Star', icon: <Heart className="h-4 w-4" />, onClick: () => toggleStar(track.id, !!track.starred), divider: true },
+              { label: 'Download', icon: <Download className="h-4 w-4" />, onClick: () => apiClient.downloadTrack(track).catch(() => { /* ignore */ }) },
+              { label: 'Share', icon: <Share2 className="h-4 w-4" />, onClick: async () => {
+                const shareEnabled = (() => { try { const v = localStorage.getItem('dino_shares'); return v ? JSON.parse(v) : true; } catch { return true; } })();
+                if (!shareEnabled) return;
+                const share = await apiClient.createShare([track.id], `${track.title} - ${getArtistDisplay(track).text || 'Unknown Artist'}`);
+                if (share?.url) await copyToClipboard(share.url);
+              } },
               ...(track.albumId ? [{ label: 'Go to Album', icon: <Disc className="h-4 w-4" />, onClick: () => navigate(`/album/${track.albumId}`), divider: true }] : []),
               ...(track.artistId ? [{ label: 'Go to Artist', icon: <User className="h-4 w-4" />, onClick: () => navigate(`/artist/${track.artistId}`) }] : []),
             ];

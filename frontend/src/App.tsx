@@ -5,7 +5,7 @@ import { PlatformProvider, usePlatform } from '@/platform';
 import { useAuthStore, usePlayerStore, useUpdateStore, initializeAuthStore, initializePlayerStore, connectDiscordRPC, refreshDiscordPresence, clearDiscordRPC } from '@/stores';
 import { useTheme } from '@/hooks';
 import { AppLayout } from '@/components';
-import { LoginScreen, HomeScreen, LibraryScreen, SearchScreen, PlaylistsScreen, FavoritesScreen, SettingsScreen, AlbumScreen, ArtistScreen } from '@/screens';
+import { LoginScreen, HomeScreen, LibraryScreen, SearchScreen, PlaylistsScreen, FavoritesScreen, SettingsScreen, AlbumScreen, ArtistScreen, SharesScreen } from '@/screens';
 
 function AppContent() {
   const platform = usePlatform();
@@ -121,6 +121,7 @@ function AppContent() {
         <Route path="/settings" element={<SettingsScreen />} />
         <Route path="/album/:id" element={<AlbumScreen />} />
         <Route path="/artist/:id" element={<ArtistScreen />} />
+        <Route path="/shares" element={<SharesScreen />} />
       </Routes>
     </AppLayout>
   );

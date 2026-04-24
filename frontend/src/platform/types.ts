@@ -127,6 +127,7 @@ export interface PlatformAPI {
   maximizeWindow?(): void;
   closeWindow?(): void;
   isWindowMaximized?(): Promise<boolean>;
+  writeClipboard?(text: string): Promise<void>;
 
   // Auto-updater (desktop only)
   checkForUpdate?(): Promise<UpdateCheckResult>;

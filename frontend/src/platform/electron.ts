@@ -28,6 +28,7 @@ declare global {
       maximizeWindow(): Promise<void>;
       closeWindow(): Promise<void>;
       isWindowMaximized(): Promise<boolean>;
+      writeClipboard(text: string): Promise<void>;
       updaterCheck(): Promise<UpdateCheckResult>;
       updaterDownload(): Promise<void>;
       updaterInstall(): Promise<void>;
@@ -573,6 +574,10 @@ export class ElectronPlatform implements PlatformAPI {
 
   async isWindowMaximized(): Promise<boolean> {
     return await window.electronAPI.isWindowMaximized();
+  }
+
+  async writeClipboard(text: string): Promise<void> {
+    await window.electronAPI.writeClipboard(text);
   }
 
   async updateDiscordPresence(args: {

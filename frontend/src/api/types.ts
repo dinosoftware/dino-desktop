@@ -233,3 +233,27 @@ export interface SavePlayQueueResponse {
 export interface GetPlayQueueResponse {
   playQueue?: PlayQueue;
 }
+
+export interface Share {
+  id: string;
+  url: string;
+  username?: string;
+  created: string;
+  expires?: string;
+  lastVisited?: string;
+  visitCount: number;
+  description?: string;
+  entry?: Track[];
+}
+
+export interface GetSharesResponse {
+  shares?: {
+    share?: Share[];
+  };
+}
+
+export interface CreateShareResponse {
+  shares?: {
+    share?: Share[];
+  };
+}

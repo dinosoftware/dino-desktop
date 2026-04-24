@@ -93,6 +93,9 @@ export function SettingsScreen() {
   const [mpvEnabled, setMpvEnabled] = useState(
     getSetting('dino_mpv', false)
   );
+  const [sharesEnabled, setSharesEnabled] = useState(
+    getSetting('dino_shares', true)
+  );
 
   const handleQualityChange = (q: StreamingQuality) => {
     setStreamingQuality(q);
@@ -126,6 +129,12 @@ export function SettingsScreen() {
   const handleAutoExtendThreshold = (v: number) => {
     setAutoExtendThreshold(v);
     setSetting('dino_auto_extend_threshold', v);
+  };
+
+  const handleSharesToggle = () => {
+    const next = !sharesEnabled;
+    setSharesEnabled(next);
+    setSetting('dino_shares', next);
   };
 
   const handleDiscordRpcToggle = () => {
@@ -437,6 +446,12 @@ export function SettingsScreen() {
             description="Submit now-playing and scrobble to server"
             checked={scrobbleEnabled}
             onChange={handleScrobbleToggle}
+          />
+          <ToggleRow
+            label="Sharing"
+            description="Create shareable links via the server's share feature"
+            checked={sharesEnabled}
+            onChange={handleSharesToggle}
           />
           {platform.isDesktop && mpvAvailable === true && (
             <ToggleRow
