@@ -147,6 +147,7 @@ export interface PlatformAPI {
   isMpvEnabled?(): boolean;
   mpvNext?(): Promise<void>;
   consumeMpvAutoAdvanced?(): boolean;
+  setReplayGainMode?(mode: string): void;
 
   // App control (desktop only)
   relaunchApp?(): Promise<void>;

@@ -72,7 +72,9 @@ function getStreamDisplay(track: Track | null): string {
 }
 
 function useQualityBadge(track: Track | null): { text: string; simple: string; toggleDetail: () => void } {
-  const [detailed, setDetailed] = useState(false);
+  const [detailed, setDetailed] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('dino_quality_detail') || 'false'); } catch { return false; }
+  });
 
   const quality = localStorage.getItem('dino_quality');
   let qualityValue = '0';
@@ -89,7 +91,13 @@ function useQualityBadge(track: Track | null): { text: string; simple: string; t
     ? (streamInfo || 'MAX')
     : (streamInfo || `${qualityValue} kbps`);
 
-  const toggleDetail = () => setDetailed(d => !d);
+  const toggleDetail = () => {
+    setDetailed((d: boolean) => {
+      const next = !d;
+      try { localStorage.setItem('dino_quality_detail', JSON.stringify(next)); } catch {}
+      return next;
+    });
+  };
 
   return {
     text: detailed ? detailedText : simpleLabel,
@@ -243,6 +251,7 @@ export function AppLayout({ children }: AppLayoutProps) {
   const [lyrics, setLyrics] = useState<StructuredLyrics[]>([]);
   const [lyricsLoading, setLyricsLoading] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [showVolumePopup, setShowVolumePopup] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
   const [userInteracting, setUserInteracting] = useState(false);
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
@@ -264,6 +273,20 @@ export function AppLayout({ children }: AppLayoutProps) {
   const sidebarCoverUrl = currentTrack?.coverArt ? apiClient.buildCoverArtUrl(currentTrack.coverArt, 200) : null;
 
   const [displayedBgCoverUrl, setDisplayedBgCoverUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (!currentTrack && (playerMode === 'fullscreen' || playerMode === 'expanded')) {
+      setPlayerMode('mini');
+    }
+  }, [currentTrack, playerMode]);
+  useEffect(() => {
+    if (!showVolumePopup) return;
+    const handler = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('[data-volume-popup]')) setShowVolumePopup(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showVolumePopup]);
   useEffect(() => {
     if (coverArtUrl) {
       const img = new Image();
@@ -565,11 +588,12 @@ export function AppLayout({ children }: AppLayoutProps) {
         isPlayerOpen && 'hidden',
         !isPlayerOpen && 'border-r border-border'
       )} style={{ height: isPlayerOpen ? '100vh' : 'calc(100vh - 80px)' }}>
-        <div className={cn('border-b border-border flex items-center', sidebarCollapsed ? 'p-2 justify-center' : 'p-4 justify-between')}>
+        <div className={cn('border-b border-border flex items-center relative', sidebarCollapsed ? 'p-2 justify-center' : 'p-4 justify-between')}>
           <div className="flex items-center gap-2.5">
-            <img src="./icon.png" alt="Dino" className={cn('rounded-lg', sidebarCollapsed ? 'w-7 h-7' : 'w-8 h-8')} />
+            <img src="./icon.png" alt="Dino" className="rounded-lg flex-shrink-0 w-8 h-8" />
             {!sidebarCollapsed && <h1 className="text-xl font-bold tracking-tight">Dino</h1>}
           </div>
+          {!sidebarCollapsed && (
           <button
             onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
             className="p-1.5 rounded-md transition-colors"
@@ -577,8 +601,18 @@ export function AppLayout({ children }: AppLayoutProps) {
             onMouseEnter={(e) => { e.currentTarget.style.color = 'hsl(var(--foreground))'; e.currentTarget.style.backgroundColor = 'hsl(var(--accent))'; }}
             onMouseLeave={(e) => { e.currentTarget.style.color = 'hsl(var(--muted-foreground))'; e.currentTarget.style.backgroundColor = ''; }}
           >
-            {sidebarCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+            <PanelLeftClose className="h-4 w-4" />
           </button>
+          )}
+          {sidebarCollapsed && (
+          <button
+            onClick={() => setSidebarCollapsed(false)}
+            className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity z-10"
+            style={{ backdropFilter: 'blur(6px)', backgroundColor: 'hsl(var(--card) / 0.7)' }}
+          >
+            <PanelLeftOpen className="h-4 w-4" style={{ color: 'hsl(var(--foreground))' }} />
+          </button>
+          )}
         </div>
         <nav className="flex-1 p-2 space-y-0.5 overflow-y-auto scrollbar-none">
           {navItems.map((item) => {
@@ -966,10 +1000,27 @@ export function AppLayout({ children }: AppLayoutProps) {
             </div>
 
             {/* RIGHT: volume + queue */}
-            <div className={cn("flex items-center gap-2 pr-3 flex-shrink-0", miniCompact ? "w-auto" : "w-[200px]")}>
-              <button onClick={() => setVolume(volume > 0 ? 0 : 1)} className="p-1.5 text-muted-foreground hover:text-foreground transition-colors">
+            <div data-volume-popup className={cn("flex items-center gap-2 pr-3 flex-shrink-0 relative", miniCompact ? "w-auto" : "w-[200px]")}>
+              <button onClick={() => miniCompact ? setShowVolumePopup(v => !v) : setVolume(volume > 0 ? 0 : 1)} className="p-1.5 text-muted-foreground hover:text-foreground transition-colors">
                 {volume === 0 ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
               </button>
+              {showVolumePopup && miniCompact && (
+                <div className="absolute bottom-full mb-2 right-3 w-36 p-2 rounded-lg border shadow-lg" style={{ backgroundColor: 'hsl(var(--card))' }}>
+                  <SliderBar
+                    value={volume}
+                    max={1}
+                    displayPercent={volume * 100}
+                    onChange={(v) => setVolume(parseFloat(String(v)))}
+                    onStart={handleVolumeStart}
+                    onEnd={handleVolumeEnd}
+                    height="h-1"
+                    trackColor="var(--slider-track)"
+                    fillColor="var(--slider-fill)"
+                    thumbColor="var(--slider-fill-strong)"
+                    step={0.01}
+                  />
+                </div>
+              )}
               {!miniCompact && (
               <div className="w-24">
                 <SliderBar

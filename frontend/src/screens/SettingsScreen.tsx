@@ -93,6 +93,9 @@ export function SettingsScreen() {
   const [mpvEnabled, setMpvEnabled] = useState(
     getSetting('dino_mpv', false)
   );
+  const [replayGainMode, setReplayGainMode] = useState<string>(
+    getSetting('dino_replay_gain', 'off')
+  );
   const [sharesEnabled, setSharesEnabled] = useState(
     getSetting('dino_shares', true)
   );
@@ -215,6 +218,14 @@ export function SettingsScreen() {
       try {
         await platform.relaunchApp();
       } catch { /* relaunch failed */ }
+    }
+  };
+
+  const handleReplayGainChange = (mode: string) => {
+    setReplayGainMode(mode);
+    setSetting('dino_replay_gain', mode);
+    if (platform.setReplayGainMode) {
+      platform.setReplayGainMode(mode);
     }
   };
 
@@ -472,6 +483,21 @@ export function SettingsScreen() {
               </div>
             </div>
           )}
+          <div>
+            <label className="text-sm font-medium block mb-1.5">Replay Gain</label>
+            <p className="text-xs text-muted-foreground mb-2">Normalize loudness across tracks or albums</p>
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { value: 'off', label: 'Off' },
+                { value: 'track', label: 'Track' },
+                { value: 'album', label: 'Album' },
+              ].map((opt) => (
+                <SelectableButton key={opt.value} selected={replayGainMode === opt.value} onClick={() => handleReplayGainChange(opt.value)}>
+                  {opt.label}
+                </SelectableButton>
+              ))}
+            </div>
+          </div>
           <ToggleRow
             label="Prevent sleep while playing"
             description="Keep screen awake during playback"
@@ -519,6 +545,14 @@ export function SettingsScreen() {
             checked={discordRpc}
             onChange={handleDiscordRpcToggle}
           />
+          {discordRpc && (
+            <button
+              onClick={() => connectDiscordRPC().then(() => refreshDiscordPresence())}
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+            >
+              <RefreshCw className="h-3 w-3" />Reconnect
+            </button>
+          )}
 
           {discordRpc && (
             <div className="space-y-4 pl-1 border-l-2 border-primary">

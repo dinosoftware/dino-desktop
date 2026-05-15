@@ -54,6 +54,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   mpvPlaylistNext: () => ipcRenderer.invoke('mpv-playlist-next'),
   mpvStopPlayback: () => ipcRenderer.invoke('mpv-stop-playback'),
   mpvPlaylistClear: () => ipcRenderer.invoke('mpv-playlist-clear'),
+  mpvSetReplayGain: (mode) => ipcRenderer.invoke('mpv-set-replaygain', mode),
 
   relaunchApp: () => ipcRenderer.invoke('relaunch-app'),
 

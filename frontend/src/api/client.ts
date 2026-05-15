@@ -1,5 +1,5 @@
 import md5 from 'blueimp-md5';
-import type { SubsonicResponse, GetLyricsResponse, GetArtistInfo2Response, GetArtistResponse, GetAlbumInfo2Response, StructuredLyrics, ArtistInfo2, ArtistWithAlbumsID3, AlbumInfo, SimilarSongs2Response, TopSongsResponse, Track, GetPlayQueueResponse, SavePlayQueueResponse, Share, GetSharesResponse, CreateShareResponse } from './types';
+import type { SubsonicResponse, GetLyricsResponse, GetArtistInfo2Response, GetArtistResponse, GetAlbumInfo2Response, GetSongResponse, StructuredLyrics, ArtistInfo2, ArtistWithAlbumsID3, AlbumInfo, SimilarSongs2Response, TopSongsResponse, Track, GetPlayQueueResponse, SavePlayQueueResponse, Share, GetSharesResponse, CreateShareResponse } from './types';
 
 const API_VERSION = '1.16.1';
 const CLIENT_NAME = 'DinoDesktop';
@@ -275,6 +275,15 @@ class APIClient {
     try {
       const data = await this.request<GetArtistResponse>('getArtist', { id: artistId });
       return data.artist || null;
+    } catch {
+      return null;
+    }
+  }
+
+  async getSong(songId: string): Promise<Track | null> {
+    try {
+      const data = await this.request<GetSongResponse>('getSong', { id: songId });
+      return data.song || null;
     } catch {
       return null;
     }

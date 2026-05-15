@@ -63,6 +63,10 @@ export interface Track {
   path?: string;
   created?: string;
   starred?: string;
+  replayGainTrackGain?: number;
+  replayGainAlbumGain?: number;
+  replayGainTrackPeak?: number;
+  replayGainAlbumPeak?: number;
 }
 
 export interface Playlist {
@@ -135,6 +139,10 @@ export interface GetArtistResponse {
 
 export interface GetAlbumResponse {
   album: AlbumWithSongsID3;
+}
+
+export interface GetSongResponse {
+  song: Track;
 }
 
 export interface SearchResponse3 {

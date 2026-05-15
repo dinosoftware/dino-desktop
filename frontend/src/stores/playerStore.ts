@@ -638,6 +638,11 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   },
 
   addNext: (tracks) => {
+    const { queue, queueIndex } = get();
+    if (queue.length === 0 || queueIndex === -1) {
+      get().playQueue(tracks, 0);
+      return;
+    }
     set((state) => {
       const insertAt = state.queueIndex + 1;
       const newQueue = [...state.queue];
@@ -699,10 +704,12 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     saveQueueToServer();
   },
 
-  clearQueue: () => {
-    set({ queue: [], originalQueue: [], queueIndex: -1, currentTrack: null, isPlaying: false });
+  clearQueue: async () => {
+    const platform = getPlatform();
+    await platform.stop();
+    set({ queue: [], originalQueue: [], queueIndex: -1, currentTrack: null, isPlaying: false, position: 0, duration: 0 });
     invalidateMpvPreload();
-    saveQueueToServer();
+    if (platformInstance?.clearDiscordPresence) platformInstance.clearDiscordPresence().catch(() => {});
   },
 
   setPosition: (position) => {

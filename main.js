@@ -34,6 +34,7 @@ class MpvPlayer {
       '--prefetch-playlist=yes',
       '--demuxer-readahead-secs=3',
       '--pause=no',
+      '--replaygain=no',
       '--volume=100',
     ], { stdio: ['ignore', 'pipe', 'pipe'] });
     this.proc.on('error', (err) => { console.error('mpv spawn error:', err); this.proc = null; });
@@ -413,6 +414,7 @@ function setupIpc() {
   ipcMain.handle('mpv-playlist-next', () => { if (mpv) mpv.playlistNext().catch(() => {}); });
   ipcMain.handle('mpv-stop-playback', () => { if (mpv) mpv.stop().catch(() => {}); });
   ipcMain.handle('mpv-playlist-clear', () => { if (mpv) mpv.playlistClear().catch(() => {}); });
+  ipcMain.handle('mpv-set-replaygain', (_e, mode) => { if (mpv) mpv.command('set_property', ['replaygain', mode]).catch(() => {}); });
 
   ipcMain.on('mpris-update-metadata', (_e, data) => {
     if (!mprisPlayer) return;

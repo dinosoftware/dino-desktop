@@ -1,6 +1,7 @@
 import type { PlatformAPI, ServerConfig, PlayQueue, UpdateCheckResult, DownloadProgress } from './types';
 import type { Track } from '@/api/types';
 import { getArtistDisplay } from '@/lib/utils';
+import { apiClient } from '@/api/client';
 
 type PlayStateCallback = (playing: boolean) => void;
 type PositionCallback = (position: number) => void;
@@ -50,6 +51,7 @@ declare global {
       mpvPlaylistNext(): Promise<void>;
       mpvStopPlayback(): Promise<void>;
       mpvPlaylistClear(): Promise<void>;
+      mpvSetReplayGain(mode: string): Promise<void>;
       relaunchApp(): Promise<void>;
       onMpvProperty(cb: (data: { name: string; data: unknown }) => void): () => void;
       onMpvEndFile(cb: (data: { reason: string }) => void): () => void;
@@ -80,6 +82,8 @@ export class ElectronPlatform implements PlatformAPI {
   private audioCtx: AudioContext | null = null;
   private analyserNode: AnalyserNode | null = null;
   private gainNode: GainNode | null = null;
+  private rgGainNode: GainNode | null = null;
+  private currentRgGain = 1.0;
   private currentSource: MediaElementAudioSourceNode | null = null;
   private useMpv = false;
   private mpvReady = false;
@@ -90,6 +94,7 @@ export class ElectronPlatform implements PlatformAPI {
   private mpvAutoAdvanced = false;
   private mpvLastPreloadedUrl: string | null = null;
   private mpvInAutoAdvanceTransition = false;
+  private mpvManualLoad = false;
   private mprisArtworkUrl: string | null = null;
   private mprisCurrentTrack: Track | null = null;
   private mpvPropertyUnsub: (() => void) | null = null;
@@ -281,7 +286,7 @@ export class ElectronPlatform implements PlatformAPI {
       if (this.currentSource && this.currentSource.mediaElement !== this.audio) {
         this.currentSource.disconnect();
         const source = this.audioCtx.createMediaElementSource(this.audio);
-        source.connect(this.gainNode!);
+        source.connect(this.rgGainNode!);
         this.currentSource = source;
       }
       return;
@@ -289,12 +294,15 @@ export class ElectronPlatform implements PlatformAPI {
     try {
       const ctx = new AudioContext();
       const source = ctx.createMediaElementSource(this.audio);
+      const rgGain = ctx.createGain();
+      rgGain.gain.value = this.currentRgGain;
       const gain = ctx.createGain();
       gain.gain.value = this.audio.volume;
       const analyser = ctx.createAnalyser();
       analyser.fftSize = 128;
       analyser.smoothingTimeConstant = 0.6;
-      source.connect(gain);
+      source.connect(rgGain);
+      rgGain.connect(gain);
       gain.connect(analyser);
       analyser.connect(ctx.destination);
       ctx.onstatechange = () => {
@@ -302,6 +310,7 @@ export class ElectronPlatform implements PlatformAPI {
       };
       this.audioCtx = ctx;
       this.currentSource = source;
+      this.rgGainNode = rgGain;
       this.gainNode = gain;
       this.analyserNode = analyser;
       this.audio.addEventListener('volumechange', () => {
@@ -310,16 +319,20 @@ export class ElectronPlatform implements PlatformAPI {
     } catch { /* already created */ }
   }
 
-  async play(_track: Track, url: string): Promise<void> {
+  async play(track: Track, url: string): Promise<void> {
     if (this.useMpv && this.mpvReady) {
       this.mpvPreloadedNext = false;
       this.mpvAutoAdvanced = false;
       this.mpvInAutoAdvanceTransition = false;
       this.mpvLastPreloadedUrl = null;
+      this.mpvManualLoad = true;
+      window.electronAPI.mpvSetPause(true);
       window.electronAPI.mpvLoad(url);
+      window.electronAPI.mpvSetPause(false);
       this.mprisSetPlayback('Playing');
       return;
     }
+    await this.applyReplayGain(track);
     if (this.preloadAudio && this.preloadUrl === url) {
       const old = this.audio;
       this.detachAudioEvents(old);
@@ -677,8 +690,18 @@ export class ElectronPlatform implements PlatformAPI {
     this.mpvAutoAdvanced = false;
     this.mpvInAutoAdvanceTransition = false;
     this.mpvLastPreloadedUrl = null;
+    this.mpvManualLoad = false;
     this.setupMpvListeners();
     window.electronAPI.mpvSetVolume(this.audio.volume);
+    const mode = (() => {
+      try {
+        const v = localStorage.getItem('dino_replay_gain');
+        return v ? JSON.parse(v) : 'off';
+      } catch { return 'off'; }
+    })() as string;
+    if (mode !== 'off') {
+      window.electronAPI.mpvSetReplayGain(mode);
+    }
     return true;
   }
 
@@ -695,6 +718,7 @@ export class ElectronPlatform implements PlatformAPI {
     this.mpvAutoAdvanced = false;
     this.mpvInAutoAdvanceTransition = false;
     this.mpvLastPreloadedUrl = null;
+    this.mpvManualLoad = false;
     this.mprisSetPlayback('Stopped');
   }
 
@@ -715,6 +739,7 @@ export class ElectronPlatform implements PlatformAPI {
           this.mpvPosition = (data.data as number) ?? 0;
           if (this.mpvPosition > 0.5) {
             this.mpvInAutoAdvanceTransition = false;
+            this.mpvManualLoad = false;
           }
           this.positionCallbacks.forEach(cb => cb(this.mpvPosition));
           this.mprisSetPosition(this.mpvPosition);
@@ -733,7 +758,11 @@ export class ElectronPlatform implements PlatformAPI {
     });
 
     this.mpvEndFileUnsub = window.electronAPI.onMpvEndFile((data) => {
-      console.log('[mpv] end-file:', data.reason, 'preloaded:', this.mpvPreloadedNext, 'transition:', this.mpvInAutoAdvanceTransition, 'listeners:', this.trackEndCallbacks.size);
+      console.log('[mpv] end-file:', data.reason, 'preloaded:', this.mpvPreloadedNext, 'transition:', this.mpvInAutoAdvanceTransition, 'manual:', this.mpvManualLoad, 'listeners:', this.trackEndCallbacks.size);
+      if (this.mpvManualLoad) {
+        console.log('[mpv] ignoring end-file from manual load replacement');
+        return;
+      }
       if (data.reason === 'stop') return;
       if (data.reason === 'error') {
         this.trackErrorCallbacks.forEach(cb => cb('mpv playback error'));
@@ -755,6 +784,58 @@ export class ElectronPlatform implements PlatformAPI {
   async mpvNext(): Promise<void> {
     if (this.useMpv && this.mpvReady) {
       await window.electronAPI.mpvPlaylistNext();
+    }
+  }
+
+  private async applyReplayGain(track: Track) {
+    const mode = (() => {
+      try {
+        const v = localStorage.getItem('dino_replay_gain');
+        return v ? JSON.parse(v) : 'off';
+      } catch { return 'off'; }
+    })() as string;
+
+    if (mode === 'off' || this.useMpv) {
+      this.currentRgGain = 1.0;
+      if (this.rgGainNode) this.rgGainNode.gain.value = 1.0;
+      return;
+    }
+
+    let trackData = track;
+    const gainDb = mode === 'album' ? track.replayGainAlbumGain : track.replayGainTrackGain;
+    if (gainDb == null) {
+      const fetched = await apiClient.getSong(track.id);
+      if (fetched) {
+        trackData = fetched;
+        track.replayGainTrackGain = fetched.replayGainTrackGain;
+        track.replayGainAlbumGain = fetched.replayGainAlbumGain;
+        track.replayGainTrackPeak = fetched.replayGainTrackPeak;
+        track.replayGainAlbumPeak = fetched.replayGainAlbumPeak;
+      }
+    }
+
+    const finalGainDb = mode === 'album' ? trackData.replayGainAlbumGain : trackData.replayGainTrackGain;
+    const peak = mode === 'album' ? trackData.replayGainAlbumPeak : trackData.replayGainTrackPeak;
+
+    if (finalGainDb == null) {
+      this.currentRgGain = 1.0;
+    } else {
+      let multiplier = Math.pow(10, finalGainDb / 20);
+      if (peak != null && peak > 0) {
+        const maxMultiplier = 1.0 / peak;
+        multiplier = Math.min(multiplier, maxMultiplier);
+      }
+      this.currentRgGain = Math.max(0, multiplier);
+    }
+
+    if (this.rgGainNode) {
+      this.rgGainNode.gain.value = this.currentRgGain;
+    }
+  }
+
+  setReplayGainMode(mode: string): void {
+    if (this.useMpv && this.mpvReady) {
+      window.electronAPI.mpvSetReplayGain(mode === 'off' ? 'no' : mode);
     }
   }
 

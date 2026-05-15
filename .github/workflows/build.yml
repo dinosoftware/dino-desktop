@@ -174,7 +174,11 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           VERSION="${{ needs.prepare.outputs.version }}"
-          NOTES=$(gh api "repos/{owner}/{repo}/releases/generate-notes" -f tag_name="$VERSION" --jq '.body')
+          if [ -f CHANGELOG.md ]; then
+            NOTES=$(cat CHANGELOG.md)
+          else
+            NOTES="Release ${VERSION}"
+          fi
           gh release edit "$VERSION" --draft=false --notes "$NOTES"
 
   build-docker:
