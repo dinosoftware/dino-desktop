@@ -265,3 +265,21 @@ export interface CreateShareResponse {
     share?: Share[];
   };
 }
+
+export interface OpenSubsonicExtension {
+  name: string;
+  versions: number[];
+}
+
+export interface GetOpenSubsonicExtensionsResponse {
+  openSubsonicExtensions: OpenSubsonicExtension[];
+}
+
+export interface SonicMatch {
+  entry: Track;
+  similarity: number;
+}
+
+export interface GetSonicSimilarTracksResponse {
+  sonicMatch: SonicMatch[];
+}

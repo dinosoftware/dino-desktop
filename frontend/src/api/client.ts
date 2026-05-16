@@ -1,5 +1,5 @@
 import md5 from 'blueimp-md5';
-import type { SubsonicResponse, GetLyricsResponse, GetArtistInfo2Response, GetArtistResponse, GetAlbumInfo2Response, GetSongResponse, StructuredLyrics, ArtistInfo2, ArtistWithAlbumsID3, AlbumInfo, SimilarSongs2Response, TopSongsResponse, Track, GetPlayQueueResponse, SavePlayQueueResponse, Share, GetSharesResponse, CreateShareResponse } from './types';
+import type { SubsonicResponse, GetLyricsResponse, GetArtistInfo2Response, GetArtistResponse, GetAlbumInfo2Response, GetSongResponse, StructuredLyrics, ArtistInfo2, ArtistWithAlbumsID3, AlbumInfo, SimilarSongs2Response, GetSonicSimilarTracksResponse, TopSongsResponse, Track, GetPlayQueueResponse, SavePlayQueueResponse, Share, GetSharesResponse, CreateShareResponse, OpenSubsonicExtension } from './types';
 
 const API_VERSION = '1.16.1';
 const CLIENT_NAME = 'DinoDesktop';
@@ -20,13 +20,24 @@ export interface ServerCredentials {
 
 class APIClient {
   private credentials: ServerCredentials | null = null;
+  private extensions: Map<string, number[]> = new Map();
+  private extensionsFetched = false;
 
   setCredentials(credentials: ServerCredentials) {
     this.credentials = credentials;
+    this.extensions.clear();
+    this.extensionsFetched = false;
+    this.fetchExtensions().catch(() => {});
   }
 
   clearCredentials() {
     this.credentials = null;
+    this.extensions.clear();
+    this.extensionsFetched = false;
+  }
+
+  hasExtension(name: string): boolean {
+    return this.extensions.has(name);
   }
 
   hasCredentials(): boolean {
@@ -82,10 +93,13 @@ class APIClient {
       }
     });
 
-    const url = `${baseUrl}/rest/${endpoint}.view?${searchParams}`;
+    const url = `${baseUrl}/rest/${endpoint}.view`;
 
+    const usePost = this.hasExtension('formPost');
     const response = await fetch(url, {
-      method: 'GET',
+      method: usePost ? 'POST' : 'GET',
+      headers: usePost ? { 'Content-Type': 'application/x-www-form-urlencoded' } : undefined,
+      body: usePost ? searchParams.toString() : undefined,
       signal: createTimeoutSignal(TIMEOUT),
     });
 
@@ -299,6 +313,16 @@ class APIClient {
   }
 
   async getSimilarSongs(songId: string, count = 50): Promise<Track[]> {
+    if (this.hasExtension('sonicSimilarity')) {
+      try {
+        const data = await this.request<GetSonicSimilarTracksResponse>('getSonicSimilarTracks', { id: songId, count });
+        if (data.sonicMatch && data.sonicMatch.length > 0) {
+          return data.sonicMatch.map((m) => m.entry);
+        }
+      } catch {
+        // fallback to getSimilarSongs2
+      }
+    }
     try {
       const data = await this.request<SimilarSongs2Response>('getSimilarSongs2', { id: songId, count });
       return data.similarSongs2?.song || [];
@@ -403,6 +427,38 @@ class APIClient {
 
   async deleteShare(shareId: string): Promise<void> {
     await this.request<object>('deleteShare', { id: shareId });
+  }
+
+  private async fetchExtensions(): Promise<void> {
+    if (this.extensionsFetched || !this.credentials) return;
+    this.extensionsFetched = true;
+    try {
+      if (!this.credentials) {
+        throw new Error('No credentials set');
+      }
+      const authParams = this.generateAuthParams();
+      const baseUrl = this.resolveBaseUrl(this.credentials.serverUrl);
+      const searchParams = new URLSearchParams();
+      Object.entries(authParams).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          searchParams.append(key, String(value));
+        }
+      });
+      const url = `${baseUrl}/rest/getOpenSubsonicExtensions.view?${searchParams}`;
+      const response = await fetch(url, { signal: createTimeoutSignal(10000) });
+      if (!response.ok) return;
+      const data = await response.json();
+      const resp = data['subsonic-response'];
+      if (resp?.status !== 'ok') return;
+      const exts: OpenSubsonicExtension[] = resp.openSubsonicExtensions || [];
+      this.extensions.clear();
+      for (const ext of exts) {
+        this.extensions.set(ext.name, ext.versions);
+      }
+      console.log('[extensions] loaded:', [...this.extensions.keys()]);
+    } catch {
+      console.log('[extensions] not available, using fallbacks');
+    }
   }
 }
 
