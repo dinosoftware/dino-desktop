@@ -610,8 +610,6 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       const shuffledRest = shuffleArray([...beforeCurrent, ...afterCurrent]);
       const newQueue = currentTrack ? [currentTrack, ...shuffledRest] : shuffledRest;
       set({ shuffle: true, queue: newQueue, queueIndex: 0 });
-      persistShuffle(true);
-      saveQueueToServer();
     } else {
       const currentTrack = queue[queueIndex];
       const originalIndex = originalQueue.length > 0
@@ -622,9 +620,11 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
         queue: originalQueue.length > 0 ? [...originalQueue] : [...queue],
         queueIndex: originalIndex >= 0 ? originalIndex : 0,
       });
-      persistShuffle(false);
-      saveQueueToServer();
     }
+    persistShuffle(!shuffle);
+    invalidateMpvPreload();
+    preloadNext();
+    saveQueueToServer();
   },
 
   addToQueue: (tracks) => {

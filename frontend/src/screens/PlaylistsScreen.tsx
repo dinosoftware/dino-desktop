@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { apiClient } from '@/api/client';
 import { usePlayerStore } from '@/stores';
 import type { Playlist, PlaylistWithSongs, GetPlaylistsResponse, GetPlaylistResponse, Track } from '@/api/types';
-import { Music, Play, ListMusic, ArrowLeft, Plus, Shuffle, Trash2, Pencil, Check, X, GripVertical, Save, Share2 } from 'lucide-react';
+import { Music, Play, ListMusic, ArrowLeft, Plus, Shuffle, Trash2, Pencil, Check, X, GripVertical, Save, Share2, RefreshCw } from 'lucide-react';
 import { LoadingScreen } from '@/components/ui';
 import { TrackRow } from '@/components';
 import { formatTime } from '@/lib/utils';
@@ -39,6 +39,10 @@ export function PlaylistsScreen() {
   useEffect(() => {
     loadPlaylists();
   }, []);
+
+  useEffect(() => {
+    if (!selectedPlaylist) loadPlaylists();
+  }, [selectedPlaylist]);
 
   const loadPlaylists = async () => {
     setLoading(true);
@@ -237,6 +241,7 @@ export function PlaylistsScreen() {
       {!selectedPlaylist ? (
         <>
           <h1 className="text-3xl font-bold tracking-tight">Playlists</h1>
+          <button onClick={loadPlaylists} className="p-1.5 text-muted-foreground hover:text-foreground rounded-md hover:bg-accent transition-colors"><RefreshCw className="h-4 w-4" /></button>
           <div className="space-y-3 animate-fade-in">
             {showCreate ? (
               <div className="flex items-center gap-2 p-3 rounded-xl border bg-card">
